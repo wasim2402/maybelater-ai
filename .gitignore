@@ -1,0 +1,37 @@
+# Secrets
+.env
+.env.*
+!.env.example
+
+# Node / Next.js
+node_modules/
+.next/
+out/
+*.tsbuildinfo
+next-env.d.ts
+test-results/
+playwright-report/
+
+# Python
+.venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# OS / editors
+.DS_Store
+Thumbs.db
+.vscode/*
+!.vscode/extensions.json
+.idea/
+
+# Taste Skill working files (gate state, screenshots, Chrome profiles)
+.taste-skill/
+shots/
+
+# Installed agent skills (version pinned in skills-lock.json; reinstall: see README)
+.agents/
+.claude/skills/
+.claude/settings.local.json
