@@ -14,30 +14,59 @@ import {
   type CaptureResult,
   type Intention,
   type IntentionPage,
+  type IntentionFilters,
   type IntentionUpdate,
-  type StatusFilter,
+  type SincePreset,
   type SuggestionKey,
+  tagCountSchema,
 } from "./types";
 
 export const intentionKeys = {
   all: ["intentions"] as const,
-  list: (status: StatusFilter) => ["intentions", "list", status] as const,
+  list: (filters: IntentionFilters) => ["intentions", "list", filters] as const,
   detail: (id: string) => ["intentions", "detail", id] as const,
 };
+
+/** Start of the "saved within" window, at midnight local time (stable for the whole day). */
+export function sinceToDate(since: SincePreset | undefined, now = new Date()): string | undefined {
+  if (!since) return undefined;
+  const start = new Date(now);
+  start.setHours(0, 0, 0, 0);
+  if (since === "7d") start.setDate(start.getDate() - 7);
+  else if (since === "30d") start.setDate(start.getDate() - 30);
+  else start.setMonth(0, 1);
+  // ISO with the local offset, e.g. 2026-11-14T00:00:00+05:30 (the API requires an offset)
+  const offset = -start.getTimezoneOffset();
+  const sign = offset >= 0 ? "+" : "-";
+  const pad = (n: number) => String(Math.floor(Math.abs(n))).padStart(2, "0");
+  const local = new Date(start.getTime() + offset * 60_000).toISOString().slice(0, 19);
+  return `${local}${sign}${pad(offset / 60)}:${pad(offset % 60)}`;
+}
+
+export function toQuery(filters: IntentionFilters) {
+  return {
+    status: filters.status,
+    q: filters.q?.trim() || undefined,
+    category: filters.category || undefined,
+    tag: filters.tag || undefined,
+    created_after: sinceToDate(filters.since),
+  };
+}
 
 const PAGE_SIZE = 20;
 
 const POLL_MS = 2_500;
 
-export function useIntentions(status: StatusFilter) {
+export function useIntentions(filters: IntentionFilters) {
   return useInfiniteQuery({
     // While any visible item is still being read, check again shortly so suggestions appear by themselves.
     refetchInterval: (query) =>
       query.state.data?.pages.some((p) => p.items.some((i) => i.analysis_status === "pending")) ? POLL_MS : false,
-    queryKey: intentionKeys.list(status),
+    queryKey: intentionKeys.list(filters),
     initialPageParam: null as string | null,
     queryFn: ({ pageParam, signal }) =>
-      api.get("/intentions", { query: { status, limit: PAGE_SIZE, cursor: pageParam }, schema: intentionPageSchema, signal }),
+      api.get("/intentions", { query: { ...toQuery(filters), limit: PAGE_SIZE, cursor: pageParam }, schema: intentionPageSchema, signal }),
+    placeholderData: (previous) => previous, // keep showing results while a new search loads
     getNextPageParam: (last: IntentionPage) => last.next_cursor,
   });
 }
@@ -47,6 +76,22 @@ export function useIntention(id: string) {
     queryKey: intentionKeys.detail(id),
     queryFn: ({ signal }) => api.get(`/intentions/${id}`, { schema: intentionSchema, signal }),
     refetchInterval: (query) => (query.state.data?.analysis_status === "pending" ? POLL_MS : false),
+  });
+}
+
+export function useTags() {
+  return useQuery({
+    queryKey: ["tags"],
+    queryFn: ({ signal }) => api.get("/tags", { schema: z.array(tagCountSchema), signal }),
+    staleTime: 60_000,
+  });
+}
+
+export function useCreateCategory() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (name: string) => api.post("/categories", { name }, { schema: categorySchema }),
+    onSuccess: () => void queryClient.invalidateQueries({ queryKey: ["categories"] }),
   });
 }
 
@@ -95,8 +140,11 @@ export function useUpdateIntention() {
         suggestion_confidence: item.suggestion_confidence ?? old?.suggestion_confidence ?? null,
       }));
       replaceInLists(queryClient, item);
-      // A status change moves the item between filter tabs.
-      if (update.status) void queryClient.invalidateQueries({ queryKey: ["intentions", "list"] });
+      // A status, category or tag change can move the item in or out of the current filters.
+      if (update.status || update.category_id !== undefined || update.tags) {
+        void queryClient.invalidateQueries({ queryKey: ["intentions", "list"] });
+      }
+      if (update.tags) void queryClient.invalidateQueries({ queryKey: ["tags"] });
     },
   });
 }

@@ -10,17 +10,28 @@ import { toast } from "sonner";
 import { ConfirmDialog } from "@/components/feedback/confirm-dialog";
 import { ErrorState, ListSkeleton, SuccessNote } from "@/components/feedback/state-views";
 import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogClose,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { AiSuggestionPanel } from "@/features/ai/ai-suggestion-panel";
 import {
   useAnalyze,
   useCategories,
+  useCreateCategory,
   useDecideSuggestion,
   useDeleteIntention,
   useIntention,
   useUpdateIntention,
 } from "@/features/intentions/api";
+import { useInboxHref } from "@/features/intentions/inbox-url";
 import { displayTitle } from "@/features/intentions/intention-row";
 import { CategoryLabel, StatusLabel } from "@/features/intentions/labels";
 import { suggestedFields } from "@/features/intentions/suggestions";
@@ -30,10 +41,11 @@ import { ApiError } from "@/lib/api/errors";
 export function ItemDetail() {
   const { id } = useParams<{ id: string }>();
   const item = useIntention(id);
+  const inboxHref = useInboxHref(); // back to the same search and filters
 
   return (
     <div className="mx-auto max-w-3xl">
-      <Link href="/app" className="inline-flex h-11 items-center gap-2 text-[15px] font-medium text-ink/80 hover:text-ink">
+      <Link href={inboxHref} className="inline-flex h-11 items-center gap-2 text-[15px] font-medium text-ink/80 hover:text-ink">
         <ArrowLeft aria-hidden className="size-4" /> Inbox
       </Link>
       {item.isPending ? (
@@ -66,6 +78,9 @@ export function ItemDetail() {
 }
 
 function Loaded({ item }: { item: Intention }) {
+  // Which saved version the details form confirmed. Lives here because the form re-mounts
+  // when the item changes on the server (including after its own save).
+  const [savedVersion, setSavedVersion] = useState<string | null>(null);
   const router = useRouter();
   const update = useUpdateIntention();
   const remove = useDeleteIntention();
@@ -137,7 +152,12 @@ function Loaded({ item }: { item: Intention }) {
 
       {/* Re-mounts when the item changes on the server (suggestions arrived, one was dismissed), so the
           form never shows stale values. */}
-      <EditForm key={item.updated_at} item={item} />
+      <EditForm
+        key={item.updated_at}
+        item={item}
+        justSaved={savedVersion === item.updated_at}
+        onSaved={setSavedVersion}
+      />
 
       <ConfirmDialog
         open={confirmDelete}
@@ -192,15 +212,23 @@ function Suggestions({ item }: { item: Intention }) {
   );
 }
 
-function EditForm({ item }: { item: Intention }) {
+function EditForm({
+  item,
+  justSaved,
+  onSaved,
+}: {
+  item: Intention;
+  justSaved: boolean;
+  onSaved: (version: string) => void;
+}) {
   const id = useId();
   const update = useUpdateIntention();
   const categories = useCategories();
+  const [creatingCategory, setCreatingCategory] = useState(false);
   const [title, setTitle] = useState(item.title ?? "");
   const [note, setNote] = useState(item.user_note ?? "");
   const [categoryId, setCategoryId] = useState(item.category?.id ?? "");
   const [tags, setTags] = useState(item.tags.join(", "));
-  const [saved, setSaved] = useState(false);
 
   const changes: IntentionUpdate = {};
   if (title.trim() !== (item.title ?? "")) changes.title = title.trim();
@@ -212,7 +240,6 @@ function EditForm({ item }: { item: Intention }) {
 
   const touch = <T,>(setter: (v: T) => void) => (value: T) => {
     setter(value);
-    setSaved(false);
   };
 
   return (
@@ -225,7 +252,7 @@ function EditForm({ item }: { item: Intention }) {
         onSubmit={(e) => {
           e.preventDefault();
           if (!dirty) return;
-          update.mutate({ id: item.id, update: changes }, { onSuccess: () => setSaved(true) });
+          update.mutate({ id: item.id, update: changes }, { onSuccess: (saved) => onSaved(saved.updated_at) });
         }}
       >
         <div className="space-y-1.5">
@@ -248,7 +275,10 @@ function EditForm({ item }: { item: Intention }) {
             <select
               id={`${id}-category`}
               value={categoryId}
-              onChange={(e) => touch(setCategoryId)(e.target.value)}
+              onChange={(e) => {
+                if (e.target.value === "__new__") setCreatingCategory(true);
+                else touch(setCategoryId)(e.target.value);
+              }}
               className="h-12 w-full rounded-md border border-input bg-card px-3 text-base focus-visible:outline-2 focus-visible:outline-ring"
             >
               <option value="">No category</option>
@@ -257,7 +287,13 @@ function EditForm({ item }: { item: Intention }) {
                   {c.name}
                 </option>
               ))}
+              <option value="__new__">New category…</option>
             </select>
+            <NewCategoryDialog
+              open={creatingCategory}
+              onOpenChange={setCreatingCategory}
+              onCreated={(createdId) => touch(setCategoryId)(createdId)}
+            />
           </div>
           <div className="space-y-1.5">
             <label htmlFor={`${id}-tags`} className="text-sm font-medium">
@@ -279,7 +315,7 @@ function EditForm({ item }: { item: Intention }) {
             {update.isPending ? "Saving…" : "Save changes"}
           </Button>
           <div aria-live="polite">
-            {saved && !dirty ? <SuccessNote>Saved.</SuccessNote> : null}
+            {justSaved && !dirty ? <SuccessNote>Saved.</SuccessNote> : null}
             {update.isError ? (
               <p role="alert" className="text-sm text-destructive">
                 {update.error.message}
@@ -289,5 +325,80 @@ function EditForm({ item }: { item: Intention }) {
         </div>
       </form>
     </section>
+  );
+}
+
+function NewCategoryDialog({
+  open,
+  onOpenChange,
+  onCreated,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  onCreated: (id: string) => void;
+}) {
+  const id = useId();
+  const create = useCreateCategory();
+  const [name, setName] = useState("");
+
+  return (
+    <Dialog
+      open={open}
+      onOpenChange={(next) => {
+        onOpenChange(next);
+        if (!next) {
+          setName("");
+          create.reset();
+        }
+      }}
+    >
+      <DialogContent className="gap-5 p-6 sm:max-w-md" showCloseButton={false}>
+        <DialogHeader>
+          <DialogTitle className="text-lg">New category</DialogTitle>
+          <DialogDescription className="text-[15px] text-ink/85">Only you see the categories you create.</DialogDescription>
+        </DialogHeader>
+        <form
+          className="space-y-4"
+          onSubmit={(e) => {
+            e.preventDefault();
+            if (!name.trim()) return;
+            create.mutate(name, {
+              onSuccess: (category) => {
+                onCreated(category.id);
+                onOpenChange(false);
+                setName("");
+                toast(`Category "${category.name}" created. Save changes to use it.`);
+              },
+            });
+          }}
+        >
+          <div className="space-y-1.5">
+            <label htmlFor={`${id}-name`} className="text-sm font-medium">
+              Name
+            </label>
+            <Input
+              id={`${id}-name`}
+              value={name}
+              maxLength={60}
+              autoFocus
+              onChange={(e) => setName(e.target.value)}
+              aria-invalid={create.isError ? true : undefined}
+              aria-describedby={create.isError ? `${id}-err` : undefined}
+            />
+            {create.isError ? (
+              <p id={`${id}-err`} role="alert" className="text-sm text-destructive">
+                {create.error.message}
+              </p>
+            ) : null}
+          </div>
+          <DialogFooter className="gap-2">
+            <DialogClose render={<Button type="button" variant="outline" />}>Cancel</DialogClose>
+            <Button type="submit" disabled={!name.trim() || create.isPending}>
+              {create.isPending ? "Creating…" : "Create category"}
+            </Button>
+          </DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
   );
 }

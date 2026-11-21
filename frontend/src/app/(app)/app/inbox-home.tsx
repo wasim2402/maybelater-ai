@@ -1,25 +1,34 @@
 "use client";
 
-import { Archive, CheckCircle2, Inbox, Plus } from "lucide-react";
-import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { useState } from "react";
+import { Archive, CheckCircle2, Inbox, Plus, Search, SearchX, X } from "lucide-react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { useEffect, useId, useRef, useState } from "react";
 import { toast } from "sonner";
 import { cn } from "cn";
 
 import { ConfirmDialog } from "@/components/feedback/confirm-dialog";
 import { EmptyState, ErrorState, ListSkeleton } from "@/components/feedback/state-views";
 import { Button } from "@/components/ui/button";
-import { useDeleteIntention, useIntentions, useUpdateIntention } from "@/features/intentions/api";
+import { Input } from "@/components/ui/input";
+import { useCategories, useDeleteIntention, useIntentions, useTags, useUpdateIntention } from "@/features/intentions/api";
+import { hasRefinements, readFilters, rememberInboxUrl, writeFilters } from "@/features/intentions/inbox-url";
 import { displayTitle, IntentionRow, type IntentionAction } from "@/features/intentions/intention-row";
-import type { Intention, IntentionStatus, StatusFilter } from "@/features/intentions/types";
+import type { Intention, IntentionFilters, IntentionStatus, SincePreset, StatusFilter } from "@/features/intentions/types";
 
 import { useOpenCapture } from "./session-shell";
 
-const FILTERS: { value: StatusFilter; label: string }[] = [
+const STATUS_TABS: { value: StatusFilter; label: string }[] = [
   { value: "open", label: "Open" },
   { value: "completed", label: "Done" },
   { value: "archived", label: "Archived" },
   { value: "all", label: "All" },
+];
+
+const SINCE_OPTIONS: { value: SincePreset | ""; label: string }[] = [
+  { value: "", label: "Any time" },
+  { value: "7d", label: "Last 7 days" },
+  { value: "30d", label: "Last 30 days" },
+  { value: "year", label: "This year" },
 ];
 
 const NEXT_STATUS: Record<Exclude<IntentionAction, "delete">, IntentionStatus> = {
@@ -36,26 +45,59 @@ const DONE_MESSAGE: Record<Exclude<IntentionAction, "delete">, string> = {
   restore: "Back in your inbox.",
 };
 
+const SEARCH_DELAY_MS = 300;
+
+const selectClass =
+  "h-11 w-full rounded-md border border-input bg-card px-3 text-[15px] focus-visible:outline-2 focus-visible:outline-ring sm:w-auto";
+
 export function InboxHome() {
+  const id = useId();
   const router = useRouter();
-  const pathname = usePathname();
   const params = useSearchParams();
-  const filter = (FILTERS.find((f) => f.value === params.get("status"))?.value ?? "open") as StatusFilter;
+  const filters = readFilters(new URLSearchParams(params.toString()));
   const openCapture = useOpenCapture();
 
-  const list = useIntentions(filter);
+  const list = useIntentions(filters);
+  const categories = useCategories();
+  const tags = useTags();
   const update = useUpdateIntention();
   const remove = useDeleteIntention();
   const [toDelete, setToDelete] = useState<Intention | null>(null);
 
-  const items = list.data?.pages.flatMap((p) => p.items) ?? [];
+  // The filters most recently asked for. router.replace() updates the URL asynchronously, so two
+  // quick changes (clear the tag, then pick a category) must build on this, not on the last render,
+  // or the second change would bring the first one back.
+  const latest = useRef<IntentionFilters>(filters);
+  const currentUrl = writeFilters(filters);
+  useEffect(() => {
+    latest.current = readFilters(new URL(currentUrl, "http://local").searchParams);
+    rememberInboxUrl(currentUrl);
+  }, [currentUrl]);
 
-  function setFilter(value: StatusFilter) {
-    const next = new URLSearchParams(params);
-    if (value === "open") next.delete("status");
-    else next.set("status", value);
-    const query = next.toString();
-    router.replace(query ? `${pathname}?${query}` : pathname, { scroll: false });
+  function navigate(next: IntentionFilters) {
+    latest.current = next;
+    router.replace(writeFilters(next), { scroll: false });
+  }
+
+  // The search box types freely; the URL (and so the query) follows 300 ms after typing stops.
+  const [text, setText] = useState(filters.q ?? "");
+  const urlQ = filters.q ?? "";
+  useEffect(() => {
+    if (text.trim() === urlQ) return;
+    const timer = setTimeout(() => {
+      navigate({ ...latest.current, q: text });
+    }, SEARCH_DELAY_MS);
+    return () => clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- only typing should schedule a search
+  }, [text]);
+
+  function apply(next: Partial<IntentionFilters>) {
+    navigate({ ...latest.current, q: text, ...next });
+  }
+
+  function clearAll() {
+    setText("");
+    navigate({ status: latest.current.status });
   }
 
   function act(action: IntentionAction, item: Intention) {
@@ -74,6 +116,10 @@ export function InboxHome() {
     );
   }
 
+  const items = list.data?.pages.flatMap((p) => p.items) ?? [];
+  const refined = hasRefinements(filters);
+  const searching = list.isFetching && !list.isFetchingNextPage && !list.isPending;
+
   return (
     <div className="mx-auto max-w-3xl">
       <div className="flex flex-wrap items-end justify-between gap-4">
@@ -83,24 +129,106 @@ export function InboxHome() {
         </Button>
       </div>
 
-      <div role="group" aria-label="Show" className="mt-5 flex gap-1 overflow-x-auto rounded-lg bg-beige/60 p-1 sm:w-fit">
-        {FILTERS.map((f) => (
-          <button
-            key={f.value}
-            type="button"
-            aria-pressed={filter === f.value}
-            onClick={() => setFilter(f.value)}
-            className={cn(
-              "h-10 shrink-0 rounded-md px-4 text-[15px] font-medium transition-colors focus-visible:outline-2 focus-visible:outline-ring",
-              filter === f.value ? "bg-card text-ink shadow-[inset_0_0_0_1px_var(--brand-line)]" : "text-ink/75 hover:text-ink",
-            )}
-          >
-            {f.label}
-          </button>
-        ))}
+      <div role="search" className="mt-5 space-y-3" aria-label="Search and filter saved items">
+        <div className="relative">
+          <label htmlFor={`${id}-q`} className="sr-only">
+            Search saved items
+          </label>
+          <Search aria-hidden className="pointer-events-none absolute top-1/2 left-3.5 size-4 -translate-y-1/2 text-muted-foreground" />
+          <Input
+            id={`${id}-q`}
+            type="search"
+            value={text}
+            maxLength={200}
+            placeholder="Search titles, notes and links"
+            onChange={(e) => setText(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Escape" && text) {
+                e.preventDefault();
+                setText("");
+              }
+            }}
+            className="h-12 pr-10 pl-10"
+          />
+          {text ? (
+            <button
+              type="button"
+              aria-label="Clear search"
+              onClick={() => setText("")}
+              className="absolute top-1/2 right-1.5 flex size-9 -translate-y-1/2 items-center justify-center rounded-md text-muted-foreground hover:bg-beige hover:text-ink"
+            >
+              <X aria-hidden className="size-4" />
+            </button>
+          ) : null}
+        </div>
+
+        <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
+          <div role="group" aria-label="Status" className="flex gap-1 overflow-x-auto rounded-lg bg-beige/60 p-1">
+            {STATUS_TABS.map((f) => (
+              <button
+                key={f.value}
+                type="button"
+                aria-pressed={filters.status === f.value}
+                onClick={() => apply({ status: f.value })}
+                className={cn(
+                  "h-9 shrink-0 rounded-md px-3.5 text-[15px] font-medium transition-colors focus-visible:outline-2 focus-visible:outline-ring",
+                  filters.status === f.value ? "bg-card text-ink shadow-[inset_0_0_0_1px_var(--brand-line)]" : "text-ink/75 hover:text-ink",
+                )}
+              >
+                {f.label}
+              </button>
+            ))}
+          </div>
+
+          <label htmlFor={`${id}-category`} className="sr-only">
+            Category
+          </label>
+          <select id={`${id}-category`} value={filters.category ?? ""} onChange={(e) => apply({ category: e.target.value || undefined })} className={selectClass}>
+            <option value="">All categories</option>
+            <option value="none">No category</option>
+            {(categories.data ?? []).map((c) => (
+              <option key={c.id} value={c.id}>
+                {c.name}
+              </option>
+            ))}
+          </select>
+
+          <label htmlFor={`${id}-tag`} className="sr-only">
+            Tag
+          </label>
+          <select id={`${id}-tag`} value={filters.tag ?? ""} onChange={(e) => apply({ tag: e.target.value || undefined })} className={selectClass}>
+            <option value="">All tags</option>
+            {filters.tag && !(tags.data ?? []).some((t) => t.tag === filters.tag) ? <option value={filters.tag}>{filters.tag}</option> : null}
+            {(tags.data ?? []).map((t) => (
+              <option key={t.tag} value={t.tag}>
+                {t.tag} ({t.count})
+              </option>
+            ))}
+          </select>
+
+          <label htmlFor={`${id}-since`} className="sr-only">
+            Saved
+          </label>
+          <select id={`${id}-since`} value={filters.since ?? ""} onChange={(e) => apply({ since: (e.target.value || undefined) as SincePreset | undefined })} className={selectClass}>
+            {SINCE_OPTIONS.map((o) => (
+              <option key={o.value} value={o.value}>
+                {o.label}
+              </option>
+            ))}
+          </select>
+
+          {refined ? (
+            <Button variant="ghost" size="sm" className="h-11 self-start" onClick={clearAll}>
+              <X aria-hidden /> Clear filters
+            </Button>
+          ) : null}
+        </div>
       </div>
 
-      <div className="mt-4">
+      <div className="mt-4" aria-busy={searching}>
+        <p role="status" aria-live="polite" className="sr-only">
+          {list.isPending ? "Loading" : searching ? "Searching" : `${items.length}${list.hasNextPage ? " or more" : ""} items shown`}
+        </p>
         {list.isPending ? (
           <ListSkeleton rows={4} />
         ) : list.isError ? (
@@ -115,10 +243,24 @@ export function InboxHome() {
             Your saved items are safe. {list.error.message}
           </ErrorState>
         ) : items.length === 0 ? (
-          <EmptyInbox filter={filter} onCapture={openCapture} />
+          refined ? (
+            <EmptyState
+              icon={SearchX}
+              title={filters.q ? `Nothing matches “${filters.q}”` : "Nothing matches these filters"}
+              action={
+                <Button variant="outline" onClick={clearAll}>
+                  Clear filters
+                </Button>
+              }
+            >
+              Try fewer words, the start of a word, or another status.
+            </EmptyState>
+          ) : (
+            <EmptyInbox status={filters.status} onCapture={openCapture} />
+          )
         ) : (
           <>
-            <ul className="space-y-1" aria-label="Saved items">
+            <ul className={cn("space-y-1 transition-opacity", searching && "opacity-60")} aria-label="Saved items">
               {items.map((item) => (
                 <IntentionRow key={item.id} item={item} href={`/app/items/${item.id}`} onAction={act} />
               ))}
@@ -156,15 +298,15 @@ export function InboxHome() {
   );
 }
 
-function EmptyInbox({ filter, onCapture }: { filter: StatusFilter; onCapture: () => void }) {
-  if (filter === "completed") {
+function EmptyInbox({ status, onCapture }: { status: StatusFilter; onCapture: () => void }) {
+  if (status === "completed") {
     return (
       <EmptyState icon={CheckCircle2} title="Nothing marked as done yet">
         When you finish something you saved, mark it as done and it moves here.
       </EmptyState>
     );
   }
-  if (filter === "archived") {
+  if (status === "archived") {
     return (
       <EmptyState icon={Archive} title="Nothing archived">
         Archive things you no longer need in your inbox. You can bring them back any time.
@@ -174,7 +316,7 @@ function EmptyInbox({ filter, onCapture }: { filter: StatusFilter; onCapture: ()
   return (
     <EmptyState
       icon={Inbox}
-      title={filter === "all" ? "Nothing saved yet" : "Your inbox is empty"}
+      title={status === "all" ? "Nothing saved yet" : "Your inbox is empty"}
       action={
         <Button onClick={onCapture}>
           <Plus aria-hidden /> Save your first link or thought

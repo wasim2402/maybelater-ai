@@ -4,8 +4,8 @@ import uuid
 from datetime import datetime
 from typing import TYPE_CHECKING, Any
 
-from sqlalchemy import CheckConstraint, DateTime, ForeignKey, Index, String, Text, UniqueConstraint, text
-from sqlalchemy.dialects.postgresql import ARRAY, JSONB, UUID
+from sqlalchemy import CheckConstraint, Computed, DateTime, ForeignKey, Index, String, Text, UniqueConstraint, text
+from sqlalchemy.dialects.postgresql import ARRAY, JSONB, TSVECTOR, UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base, Timestamps, UUIDPrimaryKey, check_in
@@ -17,6 +17,15 @@ if TYPE_CHECKING:
     from app.models.user import User
 
 OPEN_STATUSES = "status IN ('inbox', 'active')"
+
+# Full-text search over what the user saved and what describes it. 'simple' keeps words as written
+# (no language-specific stemming), so it works for any language and for names. Weighted: title
+# first, then the user's own words, then the rest.
+SEARCH_VECTOR_SQL = (
+    "setweight(to_tsvector('simple', coalesce(title, '')), 'A') || "
+    "setweight(to_tsvector('simple', coalesce(user_note, '') || ' ' || coalesce(intent, '')), 'B') || "
+    "setweight(to_tsvector('simple', coalesce(summary, '') || ' ' || coalesce(original_content, '')), 'C')"
+)
 
 
 class Intention(UUIDPrimaryKey, Timestamps, Base):
@@ -56,6 +65,7 @@ class Intention(UUIDPrimaryKey, Timestamps, Base):
         Index("ix_intentions_user_normalized_url", "user_id", "normalized_url", postgresql_where=text("normalized_url IS NOT NULL")),
         Index("uq_intentions_user_client_request", "user_id", "client_request_id", unique=True, postgresql_where=text("client_request_id IS NOT NULL")),
         Index("ix_intentions_tags", "tags", postgresql_using="gin"),
+        Index("ix_intentions_search_vector", "search_vector", postgresql_using="gin"),
     )
 
     user_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
@@ -79,6 +89,8 @@ class Intention(UUIDPrimaryKey, Timestamps, Base):
     resurface_condition: Mapped[str | None] = mapped_column(String(300))  # a simple context, e.g. "this weekend"
     field_states: Mapped[dict[str, Any]] = mapped_column(JSONB, nullable=False, server_default=text("'{}'::jsonb"), default=dict)
     analysis_status: Mapped[str] = mapped_column(String(16), nullable=False, server_default=AnalysisStatus.PENDING.value, default=AnalysisStatus.PENDING.value)
+    # Maintained by PostgreSQL from the columns above (generated, stored); never written by the app.
+    search_vector: Mapped[str | None] = mapped_column(TSVECTOR, Computed(SEARCH_VECTOR_SQL, persisted=True), deferred=True)
 
     # --- lifecycle and resurfacing ---
     status: Mapped[str] = mapped_column(String(16), nullable=False, server_default=IntentionStatus.INBOX.value, default=IntentionStatus.INBOX.value)

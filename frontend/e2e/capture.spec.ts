@@ -11,11 +11,12 @@ test("capture to inbox", async ({ page }) => {
   const toast = (text: string) => page.getByRole("region", { name: /Notifications/ }).getByText(text);
 
   await page.goto("/signup");
+  await page.waitForLoadState("networkidle"); // a dev server may still be compiling: let the page hydrate first
   await page.getByLabel("Name").fill("Capture Tester");
   await page.getByLabel("Email").fill(email);
   await page.getByLabel("Password").fill("correct horse battery");
   await page.getByRole("button", { name: "Create my account" }).click();
-  await expect(page).toHaveURL(/\/app$/);
+  await expect(page).toHaveURL(/\/app$/, { timeout: 30_000 });
 
   // Empty inbox with a direct capture action.
   await expect(page.getByText("Your inbox is empty")).toBeVisible();
@@ -48,14 +49,15 @@ test("capture to inbox", async ({ page }) => {
   await expect(page).toHaveURL(/\/app\/items\//, { timeout: 30_000 }); // a dev server compiles the route on first visit
   await expect(page.getByRole("heading", { level: 1, name: "example.com/sourdough-guide" })).toBeVisible();
   await expect(page.getByRole("link", { name: "Open original" })).toHaveAttribute("href", "https://example.com/sourdough-guide?utm_source=newsletter");
-  await page.getByLabel("Title").fill("Sourdough starter guide");
-  await page.getByLabel("Why you saved it").fill("For a weekend bake");
-  await page.getByLabel("Category").selectOption({ label: "Food and cooking" });
-  await page.getByRole("button", { name: "Save changes" }).click();
+  const details = page.getByRole("region", { name: "Details" });
+  await details.getByLabel("Title").fill("Sourdough starter guide");
+  await details.getByLabel("Why you saved it").fill("For a weekend bake");
+  await details.getByLabel("Category").selectOption({ label: "Food and cooking" });
+  await details.getByRole("button", { name: "Save changes" }).click();
   await expect(page.getByText("Saved.", { exact: true })).toBeVisible();
   await page.reload();
   await expect(page.getByRole("heading", { level: 1, name: "Sourdough starter guide" })).toBeVisible();
-  await expect(page.getByLabel("Why you saved it")).toHaveValue("For a weekend bake");
+  await expect(details.getByLabel("Why you saved it")).toHaveValue("For a weekend bake");
 
   // Mark done: it leaves Open and shows under Done.
   await page.getByRole("button", { name: "Mark as done" }).click();

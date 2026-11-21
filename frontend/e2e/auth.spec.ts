@@ -14,6 +14,7 @@ function uniqueEmail() {
 
 async function signUp(page: Page, email: string) {
   await page.goto("/signup");
+  await page.waitForLoadState("networkidle"); // a dev server may still be compiling: let the page hydrate first
   await page.getByLabel("Name").fill("Test Person");
   await page.getByLabel("Email").fill(email);
   await page.getByLabel("Password").fill(password);
@@ -31,12 +32,13 @@ test("the full account journey", async ({ page }) => {
   const email = uniqueEmail();
   await signUp(page, email);
 
-  // The page reads the account from FastAPI with a verified token.
-  await expect(page.getByText("Signed in as Test Person")).toBeVisible();
+  // The inbox loads from FastAPI with a verified token, and the shell shows who is signed in.
+  await expect(page.getByText("Your inbox is empty")).toBeVisible({ timeout: 15_000 });
+  await expect(page.getByText("Test Person").first()).toBeVisible();
 
   // The session survives a refresh.
   await page.reload();
-  await expect(page.getByText("Signed in as Test Person")).toBeVisible();
+  await expect(page.getByText("Your inbox is empty")).toBeVisible({ timeout: 15_000 });
 
   // Settings persist through the API.
   await page.getByRole("link", { name: "Settings" }).first().click();
@@ -77,7 +79,7 @@ test("the full account journey", async ({ page }) => {
   await page.getByLabel("Password").fill(password);
   await page.getByRole("button", { name: "Sign in" }).click();
   await expect(page).toHaveURL(/\/app$/);
-  await expect(page.getByText("Signed in as Ana Tester")).toBeVisible();
+  await expect(page.getByText("Your inbox is empty")).toBeVisible({ timeout: 15_000 });
 
   // Delete the account: a wrong password deletes nothing; the right one deletes everything.
   await page.goto("/app/settings");

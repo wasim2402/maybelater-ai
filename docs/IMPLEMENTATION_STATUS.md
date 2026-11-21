@@ -12,7 +12,7 @@ Update this file after each numbered implementation stage. Stage documents live 
 | 06 | `06_CAPTURE_AND_INBOX_FEATURE.md` | Done | `docs/CAPTURE.md`; capture with idempotent retries and duplicate links, inbox with filters and pagination, detail and edit, done, archive and delete; analysis as a separate step |
 | 07 | `07_AI_UNDERSTANDING_FEATURE.md` | Done | `docs/AI.md`; OpenAI structured outputs behind the provider boundary, SSRF-safe page metadata, suggestions that never overwrite user decisions, review UI with keep, edit, dismiss and retry. Live OpenAI call not verified (no key). |
 | 08 | `08_AI_AGENTS_AND_TOOLS.md` | Done | `docs/AGENTS.md`; Capture Understanding Agent with 3 narrow, audited tools; later agents documented only; evaluation set and live run (12/12 passed) |
-| 09 | `09_ORGANIZATION_AND_SEARCH.md` | Not started | |
+| 09 | `09_ORGANIZATION_AND_SEARCH.md` | Done | `docs/SEARCH.md`; PostgreSQL full-text search, combinable filters in the URL, own categories, tag counts; e2e at 1440 and 390 |
 | 10 | `10_SMART_RESURFACING_ENGINE.md` | Not started | |
 | 11 | `11_REMINDERS_AND_NOTIFICATIONS.md` | Not started | |
 | 12 | `12_USER_DASHBOARD_AND_SETTINGS.md` | Not started | |
@@ -281,3 +281,36 @@ Update this file after each numbered implementation stage. Stage documents live 
   2. Three evaluation cases (`shoes-race`, `injection-fence`, `bare-domain`) have not been run live yet, because of the quota.
   3. `evals/last_run.json` holds the second, quota-limited run (5 cases); the full results are recorded above and in `docs/AGENTS.md`.
 - **Next stage:** 09 — `09_ORGANIZATION_AND_SEARCH.md` (not started).
+
+### 2026-11-21 — Stage 09
+- **Stage:** 09 — Organization and Search
+- **Summary:**
+  - Full-text search via a generated, stored `tsvector` with a GIN index (migration `fe95352b43f6`): prefix matching, every word required, URL text matched, and input reduced to letters and digits so nothing reaches the query syntax.
+  - Filters for status, category (or none), tag and created after/before. They combine, keep keyset pagination without gaps, and malformed values return 422.
+  - `POST /categories` (private, unique per user) and `GET /tags` with counts.
+  - Web: a debounced search box; category, tag and date filters with Clear filters; everything in the URL; the item page's back link returns to the same search; a no-results state; "New category…" on the item page.
+  - New `AI_ENABLED` switch (turn suggestions off without removing the key; used for end-to-end runs).
+- **Bugs fixed:**
+  - Fast filter changes undid each other (stale filters).
+  - "Saved." never appeared after saving details (a stage 07 regression).
+  - Stale auth end-to-end assertions (since stage 06).
+  - Tag filter moved off the deprecated `ARRAY.any()` to `contains` (`@>`, served by the GIN index).
+- **Files changed:**
+  - Backend:
+    - `app/models/intention.py`; migration `fe95352b43f6`
+    - `app/services/intentions.py`, `app/api/routes/intentions.py`, `app/core/config.py`
+    - `tests/test_search.py`, `tests/test_core_units.py`
+  - Frontend:
+    - `src/features/intentions/{types,api,inbox-url,inbox-url.test}.ts`
+    - `src/app/(app)/app/inbox-home.tsx`, `src/app/(app)/app/items/[id]/item-detail.tsx`
+    - `e2e/{search,capture,auth}.spec.ts`
+  - Shared: `.env.example`, `docs/SEARCH.md`
+- **Validation:**
+  - Backend `pytest`: 211 passed (35 new).
+  - Frontend: lint and typecheck pass; `vitest` 40 passed; `next build` passes.
+  - Playwright: search at 1440 and 390, plus capture and auth at 1440, all pass against the real API and PostgreSQL (API started with `AI_ENABLED=false`).
+  - The migration is applied to the local dev database.
+- **Known issues:**
+  1. Results are ordered newest first, not by relevance, to keep stable keyset pagination. Ranking by relevance can be added as an option later.
+  2. Collections and AI-assisted organisation (the Organization Assistant) remain documented interfaces only (`docs/AGENTS.md`).
+- **Next stage:** 10 — `10_SMART_RESURFACING_ENGINE.md` (not started).

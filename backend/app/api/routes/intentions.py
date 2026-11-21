@@ -2,9 +2,11 @@
 
 from __future__ import annotations
 
+from datetime import datetime
 from uuid import UUID
 
 from fastapi import APIRouter, BackgroundTasks, Depends, Query, Request, Response, status
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from app.core.config import Settings
@@ -30,6 +32,31 @@ from app.services.analysis import Analyzer, initial_analysis_status, latest_conf
 from app.services.capture import capture
 
 router = APIRouter(tags=["intentions"])
+
+
+class InvalidFilterError(AppError):
+    status_code = 422
+    code = "validation_error"
+    message = "Some filters need attention."
+
+
+class CategoryCreate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    name: str = Field(min_length=1, max_length=60)
+
+    @field_validator("name")
+    @classmethod
+    def _name(cls, value: str) -> str:
+        value = " ".join(value.split())
+        if not value:
+            raise ValueError("Write a name for the category.")
+        return value
+
+
+class TagCount(BaseModel):
+    tag: str
+    count: int
 
 
 class InvalidCursorError(AppError):
@@ -115,13 +142,42 @@ async def create_capture(
 @router.get("/intentions", response_model=IntentionPage)
 async def list_intentions(
     status_filter: StatusFilter = Query(default="open", alias="status"),
+    q: str | None = Query(default=None, max_length=200, description="Words to find in title, note, summary or the saved text"),
+    category: str | None = Query(default=None, max_length=36, description="A category id, or 'none' for uncategorised"),
+    tag: str | None = Query(default=None, max_length=40),
+    created_after: datetime | None = Query(default=None, description="ISO 8601 with a time zone offset"),
+    created_before: datetime | None = Query(default=None, description="ISO 8601 with a time zone offset"),
     limit: int = Query(default=20, ge=1, le=100),
     cursor: str | None = Query(default=None, max_length=512),
     user: User = Depends(current_user),
     session: AsyncSession = Depends(db_session),
 ) -> IntentionPage:
+    details = []
+    category_id: UUID | None = None
+    if category and category != "none":
+        try:
+            category_id = UUID(category)
+        except ValueError:
+            details.append({"field": "category", "issue": "Use a category id or 'none'."})
+    for name, value in (("created_after", created_after), ("created_before", created_before)):
+        if value is not None and value.utcoffset() is None:
+            details.append({"field": name, "issue": "Include a time zone offset, e.g. 2026-11-21T00:00:00+05:30."})
+    if created_after and created_before and created_after.utcoffset() is not None and created_before.utcoffset() is not None and created_after >= created_before:
+        details.append({"field": "created_before", "issue": "The end must be after the start."})
+    if details:
+        raise InvalidFilterError(details=details)
+
+    filters = service.IntentionFilters(
+        status=status_filter,
+        q=q,
+        category=category_id,
+        uncategorized=category == "none",
+        tag=" ".join(tag.split()).lower() if tag else None,
+        created_after=created_after,
+        created_before=created_before,
+    )
     try:
-        items, next_cursor = await service.list_intentions(session, user, status=status_filter, limit=limit, cursor=cursor)
+        items, next_cursor = await service.list_intentions(session, user, filters=filters, limit=limit, cursor=cursor)
     except service.BadCursor as exc:
         raise InvalidCursorError() from exc
     return IntentionPage(items=[to_out(i) for i in items], next_cursor=next_cursor)
@@ -145,6 +201,19 @@ async def update_intention(
 async def delete_intention(intention_id: UUID, user: User = Depends(current_user), session: AsyncSession = Depends(db_session)) -> Response:
     await service.delete_intention(session, user, intention_id)
     return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+@router.post("/categories", response_model=CategoryOut, status_code=status.HTTP_201_CREATED, tags=["categories"])
+async def create_category(body: CategoryCreate, user: User = Depends(current_user), session: AsyncSession = Depends(db_session)) -> CategoryOut:
+    category = await service.create_category(session, user, body.name)
+    out = category_out(category)
+    assert out is not None
+    return out
+
+
+@router.get("/tags", response_model=list[TagCount], tags=["categories"])
+async def list_tags(user: User = Depends(current_user), session: AsyncSession = Depends(db_session)) -> list[TagCount]:
+    return [TagCount(tag=t, count=n) for t, n in await service.list_tags(session, user)]
 
 
 @router.get("/categories", response_model=list[CategoryOut], tags=["categories"])

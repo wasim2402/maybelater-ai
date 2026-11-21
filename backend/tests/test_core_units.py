@@ -111,3 +111,8 @@ def test_unconfigured_ai_provider_raises_clear_error() -> None:
     provider = get_ai_provider(Settings(gemini_api_key="", _env_file=None))  # type: ignore[call-arg]
     with pytest.raises(ProviderNotConfiguredError):
         asyncio.run(provider.structured(system="s", user="u", output=Settings))
+
+
+def test_ai_can_be_switched_off_without_removing_the_key() -> None:
+    assert Settings(gemini_api_key="k", _env_file=None).ai_configured is True  # type: ignore[call-arg]
+    assert Settings(gemini_api_key="k", ai_enabled=False, _env_file=None).ai_configured is False  # type: ignore[call-arg]

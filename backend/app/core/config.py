@@ -23,7 +23,8 @@ class Settings(BaseSettings):
     database_url: str = "postgresql+asyncpg://maybelater@localhost:5432/maybelater"
     test_database_url: str = ""
 
-    # AI suggestions via Google Gemini. Leave the key empty to run without them.
+    # AI suggestions via Google Gemini. Leave the key empty, or set AI_ENABLED=false, to run without them.
+    ai_enabled: bool = True
     gemini_api_key: str = ""
     gemini_model: str = "gemini-3.8-flash"
     # Used when the main model is overloaded, times out or is out of quota. Empty turns fallback off.
@@ -82,7 +83,7 @@ class Settings(BaseSettings):
 
     @property
     def ai_configured(self) -> bool:
-        return bool(self.gemini_api_key and self.gemini_model)
+        return self.ai_enabled and bool(self.gemini_api_key and self.gemini_model)
 
 
 @lru_cache

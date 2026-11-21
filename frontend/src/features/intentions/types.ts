@@ -57,6 +57,22 @@ export type CaptureResult = z.infer<typeof captureResultSchema>;
 /** Inbox filter tabs; "open" = inbox + active. */
 export type StatusFilter = "open" | "completed" | "archived" | "all";
 
+/** "Saved within" presets for the date filter. */
+export type SincePreset = "7d" | "30d" | "year";
+
+/** Everything the inbox can filter by. Mirrors GET /api/v1/intentions query parameters. */
+export interface IntentionFilters {
+  status: StatusFilter;
+  q?: string;
+  /** A category id, or "none" for items without a category. */
+  category?: string;
+  tag?: string;
+  since?: SincePreset;
+}
+
+export const tagCountSchema = z.object({ tag: z.string(), count: z.number() });
+export type TagCount = z.infer<typeof tagCountSchema>;
+
 /** Whether a field's value came from AI and what the user did with it (stage 07 shows these). */
 export type SuggestionState = "suggested" | "accepted" | "edited" | "dismissed";
 

@@ -4,10 +4,13 @@ item behaves exactly like a missing one (404)."""
 from __future__ import annotations
 
 import base64
+import re
+import unicodedata
 import uuid
+from dataclasses import dataclass
 from datetime import datetime
 
-from sqlalchemy import Select, and_, delete, or_, select
+from sqlalchemy import Select, and_, delete, false, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -51,13 +54,72 @@ def _owned(user: User) -> Select[tuple[Intention]]:
     return select(Intention).options(selectinload(Intention.category)).where(Intention.user_id == user.id)
 
 
+MAX_SEARCH_TERMS = 8
+_WORD = re.compile(r"\w+", re.UNICODE)
+
+
+def search_terms(q: str | None) -> list[str]:
+    """Words from a search box: letters and digits only (so nothing can reach the query syntax),
+    lower-cased, at most 8 terms of 40 characters."""
+    if not q:
+        return []
+    terms: list[str] = []
+    for word in _WORD.findall(q.lower()):
+        word = word.strip("_")[:40]
+        if word and word not in terms:
+            terms.append(word)
+    return terms[:MAX_SEARCH_TERMS]
+
+
+def _escape_like(term: str) -> str:
+    """Makes % and _ literal in an ILIKE pattern (with ESCAPE '\\')."""
+    return term.replace("\\", "\\\\").replace("%", r"\%").replace("_", r"\_")
+
+
+@dataclass(frozen=True)
+class IntentionFilters:
+    status: StatusFilter = "open"
+    q: str | None = None
+    category: uuid.UUID | None = None
+    uncategorized: bool = False
+    tag: str | None = None
+    created_after: datetime | None = None
+    created_before: datetime | None = None
+
+
+def _apply_filters(query: Select[tuple[Intention]], filters: IntentionFilters) -> Select[tuple[Intention]]:
+    if filters.status != "all":
+        query = query.where(Intention.status.in_([s.value for s in STATUS_FILTERS[filters.status]]))
+    terms = search_terms(filters.q)
+    if filters.q and filters.q.strip() and not terms:
+        # Typed something, but nothing searchable (only symbols): an honest "no matches", not everything.
+        query = query.where(false())
+    elif terms:
+        # Every word must match, as a word prefix ("sourd" finds "sourdough"), in the title, note,
+        # intent, summary or original text; links also match on their URL text.
+        tsquery = " & ".join(f"{t}:*" for t in terms)
+        in_text = Intention.search_vector.op("@@")(func.to_tsquery("simple", tsquery))
+        in_url = and_(*[Intention.original_url.ilike(f"%{_escape_like(t)}%", escape="\\") for t in terms])
+        query = query.where(or_(in_text, in_url))
+    if filters.uncategorized:
+        query = query.where(Intention.category_id.is_(None))
+    elif filters.category:
+        query = query.where(Intention.category_id == filters.category)
+    if filters.tag:
+        query = query.where(Intention.tags.contains([filters.tag]))  # @>, served by the GIN index
+    if filters.created_after:
+        query = query.where(Intention.created_at >= filters.created_after)
+    if filters.created_before:
+        query = query.where(Intention.created_at < filters.created_before)
+    return query
+
+
 async def list_intentions(
-    session: AsyncSession, user: User, *, status: StatusFilter, limit: int, cursor: str | None
+    session: AsyncSession, user: User, *, filters: IntentionFilters, limit: int, cursor: str | None
 ) -> tuple[list[Intention], str | None]:
-    """Newest first; keyset pagination on (created_at, id), so pages never skip or repeat items."""
-    query = _owned(user)
-    if status != "all":
-        query = query.where(Intention.status.in_([s.value for s in STATUS_FILTERS[status]]))
+    """Newest first; keyset pagination on (created_at, id), so pages never skip or repeat items,
+    with or without filters. Every query is scoped to the user and fully parameterised."""
+    query = _apply_filters(_owned(user), filters)
     if cursor:
         created, ident = decode_cursor(cursor)
         query = query.where(or_(Intention.created_at < created, and_(Intention.created_at == created, Intention.id < ident)))
@@ -174,3 +236,51 @@ async def request_reanalysis(session: AsyncSession, user: User, intention_id: uu
     await session.commit()
     session.expire(item)
     return await get_intention(session, user, intention_id)
+
+
+class CategoryExistsError(ConflictError):
+    code = "category_exists"
+    message = "You already have a category with that name."
+
+
+MAX_USER_CATEGORIES = 50
+
+
+def slugify(name: str) -> str:
+    ascii_name = unicodedata.normalize("NFKD", name).encode("ascii", "ignore").decode()
+    slug = re.sub(r"[^a-z0-9]+", "-", ascii_name.lower()).strip("-")[:50]
+    return slug or f"category-{uuid.uuid4().hex[:8]}"
+
+
+async def create_category(session: AsyncSession, user: User, name: str) -> Category:
+    """A category of the user's own. Names are unique per user (case-insensitive) and may not repeat
+    a system category, so the list never shows two "Reading"s."""
+    name = " ".join(name.split())
+    existing = await session.execute(
+        select(Category.id).where(
+            or_(Category.user_id.is_(None), Category.user_id == user.id), func.lower(Category.name) == name.lower()
+        )
+    )
+    if existing.first():
+        raise CategoryExistsError()
+    count = (await session.execute(select(func.count()).select_from(Category).where(Category.user_id == user.id))).scalar_one()
+    if count >= MAX_USER_CATEGORIES:
+        raise ConflictError(f"You can have up to {MAX_USER_CATEGORIES} categories of your own.")
+    base, slug, n = slugify(name), slugify(name), 2
+    while (await session.execute(select(Category.id).where(Category.user_id == user.id, Category.slug == slug))).first():
+        slug = f"{base[:46]}-{n}"
+        n += 1
+    category = Category(user_id=user.id, name=name, slug=slug)
+    session.add(category)
+    await session.commit()
+    return category
+
+
+async def list_tags(session: AsyncSession, user: User, limit: int = 100) -> list[tuple[str, int]]:
+    """The user's tags with how many items carry each, most used first."""
+    tag = func.unnest(Intention.tags).label("tag")
+    inner = select(tag).where(Intention.user_id == user.id).subquery()
+    rows = await session.execute(
+        select(inner.c.tag, func.count().label("n")).group_by(inner.c.tag).order_by(func.count().desc(), inner.c.tag).limit(limit)
+    )
+    return [(r.tag, r.n) for r in rows]
