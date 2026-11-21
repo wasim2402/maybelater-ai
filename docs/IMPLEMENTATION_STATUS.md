@@ -6,7 +6,7 @@ Update this file after each numbered implementation stage. Stage documents live 
 |---|---|---|---|
 | 01 | `01_PRODUCT_REQUIREMENTS.md` | Done | `docs/PRODUCT_REQUIREMENTS.md`: scope, user stories, requirement → screen → API → test matrix |
 | 02 | `02_DESIGN_SYSTEM_AND_UX.md` | Done | `docs/DESIGN_SYSTEM.md`; theme in `src/theme/`; landing `/`, `/login`, `/signup`; Taste Skill gate PASS. Auth not wired (stage 05). |
-| 03 | `03_SYSTEM_ARCHITECTURE.md` | Not started | |
+| 03 | `03_SYSTEM_ARCHITECTURE.md` | Done | `docs/ARCHITECTURE.md`; shared error format, request ids, JSON logs, size and rate limits, SSRF guards, readiness check, typed web API client |
 | 04 | `04_DATABASE_AND_DATA_MODELS.md` | Not started | |
 | 05 | `05_AUTH_AND_USER_ACCOUNTS.md` | Not started | |
 | 06 | `06_CAPTURE_AND_INBOX_FEATURE.md` | Not started | |
@@ -61,3 +61,39 @@ Update this file after each numbered implementation stage. Stage documents live 
 - **Next stage:** 03 — `03_SYSTEM_ARCHITECTURE.md` (not started).
 
 - **Follow-up (2026-11-21):** removed the `/design` reference page and its link from the auth screens, at the user's request.
+
+### 2026-11-21 — Stage 03
+- **Stage:** 03 — System Architecture
+- **Summary:** Built the shared API foundation every later endpoint inherits:
+  - one error body with stable codes and no stack traces, carrying the request id;
+  - request ids (`X-Request-ID`) and JSON access logs that omit query strings and bodies;
+  - a crash guard inside CORS, so the browser can read a 500;
+  - a request body size cap and a sliding-window `RateLimit` dependency;
+  - SSRF-safe URL validation, both shape and DNS;
+  - UTC and time-zone helpers, cursor `Page[T]` and error schemas, and an `AIProvider` boundary;
+  - settings that reject `*` CORS and require a strong `AUTH_SECRET` outside development, and API docs only in development;
+  - a `/api/v1/health/ready` database check.
+
+  On the web side: a typed API client with Zod validation and `ApiError`, and a React Query retry policy that never retries a 4xx.
+- **Files changed:**
+  - `backend/app/main.py`
+  - `backend/app/core/{config,errors,middleware,request_context,logging,rate_limit,url_safety,time,deps}.py`
+  - `backend/app/api/routes/health.py`
+  - `backend/app/schemas/{common,health}.py`
+  - `backend/app/services/ai/provider.py`
+  - `backend/requirements.txt` and `requirements.lock.txt` (added `tzdata`)
+  - `backend/tests/{conftest,test_api_foundation,test_core_units,test_health}.py`
+  - `frontend/src/lib/api/{client,errors,client.test}.ts`
+  - `frontend/src/app/(app)/providers.tsx`
+  - `.env.example` (fixed the broken `BETTER_AUTH_SECRET` line; added `LOG_LEVEL` and `MAX_REQUEST_BYTES`)
+  - `docs/ARCHITECTURE.md`
+- **Validation:**
+  - Backend: `pytest` 43 passed.
+  - Frontend: `npm run lint` and `npm run typecheck` pass; `npm test` 7 passed.
+  - The API ran alone with the real `backend/.env`: health 200; ready 200 (database ok, AI not configured); CORS and request id headers present; JSON logs.
+  - The web dev server ran alone: `/`, `/login` and `/signup` return 200.
+- **Known issues:**
+  1. Rate limits are kept in memory, per process; they move to Redis when the API scales out (stage 14).
+  2. The current-user dependency and ownership enforcement land in stage 05, with auth.
+  3. The OpenAI provider implementation lands in stage 07.
+- **Next stage:** 04 — `04_DATABASE_AND_DATA_MODELS.md` (not started).
