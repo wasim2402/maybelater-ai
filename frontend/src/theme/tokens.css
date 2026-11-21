@@ -1,0 +1,46 @@
+/*
+  MaybeLater theme tokens: the ONE place to change colours, shape and type roles.
+
+  Everything reads from here:
+  - the product app (Tailwind + shadcn) through src/app/globals.css
+  - the public landing page (Taste Skill kit) through src/app/(marketing)/marketing.css
+
+  To re-theme: edit section 1. Keep section 2 in step (each derived value notes its contrast rule).
+  To change fonts: edit src/theme/fonts.ts only. This file maps the loaded fonts to roles in section 4.
+*/
+
+:root {
+  /* 1. Brand palette (from the brand board: Sage, White, Beige, Grey) */
+  --brand-sage: #8b9a6e;   /* accent: primary buttons, selected states, brand marks */
+  --brand-paper: #f7f2eb;  /* page ground ("White") */
+  --brand-beige: #eae2d6;  /* surfaces: bands, panels, hovered rows */
+  --brand-grey: #eeeeee;   /* quiet fills: inputs, skeletons, chips */
+  --brand-ink: #2a2b24;    /* text: warm near-black, never #000 */
+
+  /* 2. Derived colours (keep these readable when section 1 changes) */
+  --brand-card: #fdfbf7;       /* raised cards and dialogs on the paper ground */
+  --brand-sage-deep: #556140;  /* sage for text, links and focus rings: 4.5:1 or more on paper */
+  --brand-sage-soft: #e3e8d8;  /* AI-suggestion wash: a pale sage behind suggested fields */
+  --brand-on-sage: #161712;    /* text on sage buttons: 4.5:1 or more on --brand-sage */
+  --brand-muted: #60615d;      /* secondary text: 4.5:1 or more on paper and beige */
+  --brand-line: #ddd5c8;       /* hairlines and borders */
+  --brand-danger: #a4442f;     /* destructive actions and errors: 4.5:1 or more on paper */
+  --brand-success: #4f6b3a;    /* saved and done confirmations */
+
+  /* Inverse ground (dark footer band on the landing page) */
+  --brand-inv-bg: #2a2b24;
+  --brand-inv-surface: #363730;
+  --brand-inv-ink: #f7f2eb;
+  --brand-inv-muted: #a9a69f;
+
+  /* 3. Shape */
+  --brand-radius: 0.75rem;     /* base radius: cards, dialogs. Controls step down from it. */
+
+  /* 4. Type roles. Font families are loaded in src/theme/fonts.ts (CSS variables --font-brand-*). */
+  --brand-font-display: var(--font-brand-display), ui-sans-serif, system-ui, sans-serif;
+  --brand-font-text: var(--font-brand-text), ui-sans-serif, system-ui, sans-serif;
+  --brand-font-mono: var(--font-brand-mono), ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+  --brand-display-weight: 400;          /* headings: size and tight tracking carry them, never bold-and-big */
+  --brand-display-tracking: -0.03em;
+  --brand-display-tracking-xl: -0.04em; /* hero-size headings */
+}

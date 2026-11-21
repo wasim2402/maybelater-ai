@@ -12,6 +12,8 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // Vendored Taste Skill kit (copied from the skill; never edited by hand)
+    "public/assets/**",
   ]),
 ]);
 

@@ -1,0 +1,130 @@
+/*
+  Landing page styles. The Taste Skill kit (public/assets/*.css) provides the system; this file
+  1) feeds the kit's palette and type tokens from src/theme/tokens.css (one source of truth), and
+  2) holds page CSS that the skill allows: only what sits inside a visual.
+  `:root:root` outranks the kit's own :root defaults regardless of stylesheet order.
+*/
+@import "../../theme/tokens.css";
+
+:root:root {
+  --p-bg: var(--brand-paper);
+  --p-surface: var(--brand-beige);
+  --p-ink: var(--brand-ink);
+  --p-muted: var(--brand-muted);
+  --p-accent: var(--brand-sage);
+  --p-accent-ink: var(--brand-on-sage);
+  --p-action: var(--brand-sage);
+  --p-action-ink: var(--brand-on-sage);
+  --p-inv-bg: var(--brand-inv-bg);
+  --p-inv-surface: var(--brand-inv-surface);
+  --p-inv-ink: var(--brand-inv-ink);
+  --p-inv-muted: var(--brand-inv-muted);
+  --p-inv-accent: var(--brand-sage);
+  --p-inv-accent-ink: var(--brand-on-sage);
+  --p-inv-action: var(--brand-sage);
+  --p-inv-action-ink: var(--brand-on-sage);
+  --font-display: var(--brand-font-display);
+  --font-text: var(--brand-font-text);
+  --font-mono: var(--brand-font-mono);
+  --display-weight: var(--brand-display-weight);
+  --display-tracking: var(--brand-display-tracking);
+  --display-tracking-xl: var(--brand-display-tracking-xl);
+  --ly-scale: 0.98;
+}
+
+/* Focus ring: the sage accent is under 3:1 on paper, so the ring uses the deep sage (same 2px strength). */
+:root:root :focus-visible { outline-color: var(--brand-sage-deep); }
+
+/* ---------- Hero visual: the capture moment (page CSS inside a visual) ---------- */
+.hv { position: absolute; inset: 0; padding: var(--s-7); display: flex; flex-direction: column; gap: var(--s-4); }
+.hv__group { padding: 0 var(--s-1); }
+.hv__card { background: var(--brand-card); border: 1px solid var(--line); border-radius: var(--r-md); padding: var(--s-5); }
+.hv__label { font-size: var(--t-label); font-weight: 500; color: var(--muted); }
+.hv__paste { margin-top: var(--s-2); font: 400 15px/1.5 var(--font-mono); color: var(--ink); background: var(--brand-grey); border-radius: var(--r-sm); padding: 10px 12px; overflow-wrap: anywhere; }
+.hv__row { display: flex; align-items: center; justify-content: space-between; gap: var(--s-3); margin-top: var(--s-3); }
+.hv__saved { display: inline-flex; align-items: center; gap: 6px; font-size: var(--t-small); color: var(--brand-success); font-weight: 500; }
+.hv__btn { white-space: nowrap; display: inline-flex; align-items: center; height: 36px; padding: 0 14px; border-radius: var(--r-sm); background: var(--brand-sage); color: var(--brand-on-sage); font-size: var(--t-small); font-weight: 500; }
+.hv__btn--danger { background: var(--brand-danger); color: #fff; }
+.hv__btn--quiet { background: transparent; border: 1px solid var(--line-strong); color: var(--ink); }
+.hv__sugs { display: grid; gap: var(--s-2); margin-top: var(--s-3); }
+.hv__sug { border: 1px dashed color-mix(in oklab, var(--brand-sage-deep) 50%, transparent); background: color-mix(in oklab, var(--brand-sage-soft) 70%, transparent); border-radius: var(--r-sm); padding: 10px 12px; }
+.hv__sug--kept { border-style: solid; border-color: var(--line); background: var(--brand-paper); }
+.hv__sughead { display: flex; justify-content: space-between; font-size: var(--t-label); font-weight: 500; color: var(--muted); }
+.hv__tag { color: var(--brand-sage-deep); }
+.hv__sug--kept .hv__tag { color: var(--brand-success); }
+.hv__val { margin-top: 2px; font-size: 15px; line-height: 1.45; color: var(--ink); }
+@media (max-width: 1023px) { .hv { padding: var(--s-5); } .hv__group { display: none; } }
+@media (max-width: 639px) { .hv { padding: var(--s-4); } .hv__sug:nth-child(n + 2) { display: none; } .hero__media .ly-float, .hv__saved { display: none; } }
+
+/* ---------- App frame (sections-library.md, app-frame: the whole recipe) ---------- */
+.app.ui { display: grid; grid-template-columns: minmax(0, 5fr) minmax(0, 7fr); margin-top: var(--s-7); background: var(--u-bg); border: 1px solid var(--u-border); border-radius: var(--u-r); box-shadow: var(--u-shadow); }
+.app > .app__pane { position: relative; min-width: 0; min-height: 0; overflow: hidden; }
+.app > .app__pane + .app__pane { border-left: 1px solid var(--u-line); }
+.app > .app__pane > .ui-panel { width: 100%; border: 0; border-radius: 0; box-shadow: none; }
+.app > .app__pane::after { content: ""; position: absolute; inset: auto 0 0 0; height: 64px; background: linear-gradient(transparent, var(--u-bg)); pointer-events: none; }
+@media (min-width: 1024px) and (max-width: 1279px) { .app.ui { grid-template-columns: minmax(0, 4fr) minmax(0, 8fr); } }
+@media (max-width: 1023px) {
+  .app.ui { grid-template-columns: minmax(0, 1fr); grid-template-rows: auto minmax(0, 1fr); }
+  .app > .app__pane--list { max-height: 252px; }
+  .app > .app__pane--list::after { display: none; }
+  .app .ui-win__side { display: none; }
+  .app .ui-win__body { grid-template-columns: minmax(0, 1fr); }
+  .app > .app__pane + .app__pane { border-left: 0; border-top: 1px solid var(--u-line); }
+}
+@media (max-width: 639px) {
+  .app.ui { grid-template-rows: minmax(0, 1fr); }
+  .app > .app__pane--list { display: none; }
+  .app > .app__pane + .app__pane { border-top: 0; }
+}
+
+/* ---------- Section heights the skill allows as page CSS ---------- */
+/* #how keeps its three steps in one row from 1024 (no half-empty row); the tablet stacks them over two screens. */
+@media (min-width: 1024px) { #how .grid > .card.span-4 { grid-column: span 4; } }
+/* Tablet: each step card puts its words beside its panel, so the three steps hold one screen;
+   the FAQ drops its picture and the suggestions frame gets lower, so both stay one screen. */
+@media (min-width: 640px) and (max-width: 1023px) {
+  #how .card--open { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); column-gap: var(--s-5); align-items: stretch; }
+  #how .card--open > .panel { margin: 0; --p-h: 200px; }
+  #suggestions .frame--split { --ratio: 56%; }
+}
+/* FAQ below 1024: the tablet keeps the split (words and picture left, answers right);
+   the phone shows the picture as a compact strip: the question and its two buttons on one line. */
+@media (min-width: 640px) and (max-width: 1023px) {
+  #faq .grid--top > .span-5 { grid-column: 1 / span 5; }
+  #faq .grid--top > .faq { grid-column: 6 / -1; }
+  #faq .faq-visual { aspect-ratio: 9 / 17; }
+}
+@media (max-width: 639px) {
+  #faq .faq-visual { aspect-ratio: auto; height: 72px; }
+  #faq .fv { grid-template-columns: minmax(0, 1fr) auto; align-items: center; padding: var(--s-3) var(--s-4); }
+  #faq .fv > .hv__val { display: none; }
+  #faq .fv .hv__row { margin: 0; }
+  #faq .fv .hv__btn--quiet { display: none; }
+}
+@media (max-width: 639px) { #how { --hm: 2; } #suggestions .frame--split { --ratio: 72%; } }
+/* close-word: the name is hand-set per breakpoint so its 10 letters stay inside the .wrap. */
+/* 10 letters at about 4.8 em wide: the name runs from the left line to the right line. */
+:root:root .close__word { font-size: min(calc((100vw - 2 * var(--gut)) / 4.85), 264px); padding-bottom: 0.14em; }
+@media (max-width: 639px) {
+  :root:root .close__word { font-size: calc((100vw - 2 * var(--gut)) / 4.85); }
+  /* one phone screen: the footer keeps its links and drops the line that repeats the hero */
+  .closing__links .footer__lede, .closing__links .footer__col--extra { display: none; }
+}
+
+/* The open pane: the doc fills the pane (no empty strip beside it); its note sits in the right gutter. */
+.app > .app__pane--open > .ui-doc { width: 100%; min-height: 100%; padding-right: 248px; }
+.app > .app__pane--open .ui-doc__page { border-radius: 0; }
+.app > .app__pane--open .ui-doc__note { right: 24px; top: 72px; }
+@media (max-width: 639px) { .app > .app__pane--open > .ui-doc { padding-right: 0; } .app > .app__pane--open .ui-doc__note { position: relative; right: auto; top: auto; width: auto; margin: 0 16px 16px; } }
+
+/* ---------- Step panels and the suggestions frame (inside visuals) ---------- */
+#how .panel { --p-h: 260px; }
+@media (max-width: 639px) { #how .panel { --p-h: 300px; } }
+.sp { position: absolute; inset: var(--s-5) var(--s-5) auto var(--s-5); display: grid; gap: var(--s-2); }
+@media (max-width: 639px) { .sp { inset: var(--s-4) var(--s-4) auto var(--s-4); } .sp .hv__sug:nth-child(n + 2), .sp .hv__card:nth-child(n + 2) { display: none; } }
+.sp .hv__card { padding: var(--s-4); }
+.sg { position: absolute; inset: 0; display: grid; align-content: start; gap: var(--s-3); padding: 56px; }
+.faq-visual { aspect-ratio: 16 / 9; }
+.fv { position: absolute; inset: 0; display: grid; align-content: center; gap: var(--s-2); padding: var(--s-6); }
+.sg__title { font-size: var(--t-card); font-weight: 500; color: var(--ink); }
+@media (max-width: 639px) { .sg { padding: var(--s-5); } .fv { padding: var(--s-5); } }
