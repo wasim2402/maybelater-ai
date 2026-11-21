@@ -7,7 +7,7 @@ Update this file after each numbered implementation stage. Stage documents live 
 | 01 | `01_PRODUCT_REQUIREMENTS.md` | Done | `docs/PRODUCT_REQUIREMENTS.md`: scope, user stories, requirement → screen → API → test matrix |
 | 02 | `02_DESIGN_SYSTEM_AND_UX.md` | Done | `docs/DESIGN_SYSTEM.md`; theme in `src/theme/`; landing `/`, `/login`, `/signup`; Taste Skill gate PASS. Auth not wired (stage 05). |
 | 03 | `03_SYSTEM_ARCHITECTURE.md` | Done | `docs/ARCHITECTURE.md`; shared error format, request ids, JSON logs, size and rate limits, SSRF guards, readiness check, typed web API client |
-| 04 | `04_DATABASE_AND_DATA_MODELS.md` | Not started | |
+| 04 | `04_DATABASE_AND_DATA_MODELS.md` | Done | `docs/DATA_MODEL.md`; 6 tables, initial migration `08f4688f0da9` with 9 system categories; ownership, consent and deletion enforced by the database |
 | 05 | `05_AUTH_AND_USER_ACCOUNTS.md` | Not started | |
 | 06 | `06_CAPTURE_AND_INBOX_FEATURE.md` | Not started | |
 | 07 | `07_AI_UNDERSTANDING_FEATURE.md` | Not started | |
@@ -97,3 +97,28 @@ Update this file after each numbered implementation stage. Stage documents live 
   2. The current-user dependency and ownership enforcement land in stage 05, with auth.
   3. The OpenAI provider implementation lands in stage 07.
 - **Next stage:** 04 — `04_DATABASE_AND_DATA_MODELS.md` (not started).
+
+### 2026-11-21 — Stage 04
+- **Stage:** 04 — Database and Data Models
+- **Summary:** Added SQLAlchemy models for users, categories, intentions, intention_analyses, reminders and activities, plus the initial Alembic migration with a 9-row system category seed. The database itself enforces:
+  - ownership, through composite foreign keys to `intentions(id, user_id)`;
+  - consent: a reminder cannot be scheduled, snoozed or sent without `approved_at`;
+  - valid statuses and types, URL rules, size bounds and timestamp rules;
+  - explicit deletion behaviour: intention deletes cascade to reminders, analyses and activities, a deleted category leaves its intentions uncategorised, and account deletion removes everything the user owns.
+
+  Captured content is kept apart from AI interpretation, and `field_states` records who stands behind each editable value, so AI never overwrites user edits. Added the validated `UserPreferences` schema and constraint naming conventions.
+- **Files changed:**
+  - `backend/app/db/base.py`
+  - `backend/app/models/{__init__,enums,user,category,intention,analysis,reminder,activity}.py`
+  - `backend/app/schemas/user.py`
+  - `backend/alembic/env.py` (URL override for tests; type and default comparison)
+  - `backend/alembic/versions/08f4688f0da9_initial_schema.py`
+  - `backend/tests/{db_utils,test_migrations,test_schema_rules}.py`
+  - `docs/DATA_MODEL.md`
+- **Validation:**
+  - `pytest`: 63 passed. This covers a fresh migration, downgrade to base and re-upgrade, no drift between models and migrations, and every constraint and cascade rule against PostgreSQL 18.4.
+  - `alembic upgrade head` applied to the local development database.
+- **Known issues:**
+  1. Better Auth's own tables arrive in stage 05; account deletion must remove those rows too.
+  2. The rule that AI writes only `suggested` fields is documented in the schema and enforced in the service in stage 07.
+- **Next stage:** 05 — `05_AUTH_AND_USER_ACCOUNTS.md` (not started).
