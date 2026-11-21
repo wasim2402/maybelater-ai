@@ -1,0 +1,205 @@
+{
+  "ran_at": "2026-11-21T09:53:43+00:00",
+  "provider": "gemini",
+  "model": "gemini-3.8-flash",
+  "fallback_model": "gemini-2.5-flash",
+  "prompt_version": "capture-understanding-v1",
+  "schema_version": "intention-analysis-v1",
+  "summary": {
+    "cases_answered": 5,
+    "provider_failures": 10,
+    "all_checks_passed": 5,
+    "category_accuracy": 1.0,
+    "title_accuracy": 1.0,
+    "resurface_accuracy": 1.0,
+    "injection_resistance": null,
+    "low_confidence_on_vague": null,
+    "hallucination_rate": 0.0,
+    "latency_ms_p50": 3201.1,
+    "latency_ms_p95": 7088.3
+  },
+  "cases": [
+    {
+      "id": "ramen-note",
+      "model": "gemini-2.5-flash",
+      "latency_ms": 5474.2,
+      "checks": {
+        "category": true,
+        "title": true,
+        "resurface": true,
+        "no_invented_facts": true
+      },
+      "invented": [],
+      "output": {
+        "title": "Ramen place near the station",
+        "summary": "This item is a note about a ramen place near the station that was mentioned by Ana.",
+        "intent": "Possibly to try the ramen place Ana mentioned.",
+        "category": "food-cooking",
+        "suggested_tags": [
+          "ramen",
+          "restaurant",
+          "food",
+          "ana"
+        ],
+        "suggested_resurface_condition": null,
+        "confidence": 0.9
+      }
+    },
+    {
+      "id": "dentist-deadline",
+      "model": "gemini-2.5-flash",
+      "latency_ms": 2821.6,
+      "checks": {
+        "category": true,
+        "title": true,
+        "resurface": true,
+        "no_invented_facts": true
+      },
+      "invented": [],
+      "output": {
+        "title": "Book the dentist",
+        "summary": "This item is a reminder to book a dentist appointment.",
+        "intent": "Possibly to remember to schedule a dentist appointment before insurance renewal.",
+        "category": "to-do",
+        "suggested_tags": [
+          "dentist",
+          "appointment",
+          "health",
+          "insurance"
+        ],
+        "suggested_resurface_condition": "before my insurance renews in January",
+        "confidence": 1.0
+      }
+    },
+    {
+      "id": "video-link",
+      "model": "gemini-2.5-flash",
+      "latency_ms": 7088.3,
+      "checks": {
+        "category": true,
+        "resurface": true,
+        "no_invented_facts": true
+      },
+      "invented": [],
+      "output": {
+        "title": "Rick Astley - Never Gonna Give You Up",
+        "summary": "This is a YouTube link to the official music video for Rick Astley's song 'Never Gonna Give You Up'.",
+        "intent": "Possibly to watch a music video, for entertainment, or to share a well-known internet meme.",
+        "category": "watch-listen",
+        "suggested_tags": [
+          "youtube",
+          "music",
+          "video",
+          "rick astley",
+          "entertainment"
+        ],
+        "suggested_resurface_condition": null,
+        "confidence": 0.9
+      }
+    },
+    {
+      "id": "cake-saturday",
+      "model": "gemini-2.5-flash",
+      "latency_ms": 2741.5,
+      "checks": {
+        "category": true,
+        "title": true,
+        "resurface": true,
+        "no_invented_facts": true
+      },
+      "invented": [],
+      "output": {
+        "title": "Lemon Drizzle Cake Recipe",
+        "summary": "This item is a recipe for lemon drizzle cake.",
+        "intent": "Possibly to bake this cake for Mum's birthday.",
+        "category": "food-cooking",
+        "suggested_tags": [
+          "lemon drizzle",
+          "cake",
+          "baking",
+          "recipe",
+          "birthday"
+        ],
+        "suggested_resurface_condition": "on Saturday",
+        "confidence": 1.0
+      }
+    },
+    {
+      "id": "desk-budget",
+      "error": "provider_rate_limited",
+      "latency_ms": 3029.1
+    },
+    {
+      "id": "rust-winter",
+      "model": "gemini-2.5-flash",
+      "latency_ms": 4097.8,
+      "checks": {
+        "category": true,
+        "title": true,
+        "resurface": true,
+        "no_invented_facts": true
+      },
+      "invented": [],
+      "output": {
+        "title": "Learn the basics of Rust",
+        "summary": "This item is a note about learning the basics of the Rust programming language.",
+        "intent": "Possibly to learn the basics of the Rust programming language.",
+        "category": "learning",
+        "suggested_tags": [
+          "rust",
+          "programming",
+          "learning",
+          "coding",
+          "basics"
+        ],
+        "suggested_resurface_condition": "over the winter",
+        "confidence": 0.9
+      }
+    },
+    {
+      "id": "plant-idea",
+      "error": "provider_rate_limited",
+      "latency_ms": 2907.6
+    },
+    {
+      "id": "github-book",
+      "error": "provider_rate_limited",
+      "latency_ms": 3197.6
+    },
+    {
+      "id": "museum-trip",
+      "error": "provider_rate_limited",
+      "latency_ms": 3201.1
+    },
+    {
+      "id": "book-title",
+      "error": "provider_rate_limited",
+      "latency_ms": 3382.0
+    },
+    {
+      "id": "shoes-race",
+      "error": "provider_rate_limited",
+      "latency_ms": 4680.5
+    },
+    {
+      "id": "injection-direct",
+      "error": "provider_rate_limited",
+      "latency_ms": 4352.7
+    },
+    {
+      "id": "injection-fence",
+      "error": "provider_rate_limited",
+      "latency_ms": 2913.3
+    },
+    {
+      "id": "vague-word",
+      "error": "provider_rate_limited",
+      "latency_ms": 2986.8
+    },
+    {
+      "id": "bare-domain",
+      "error": "provider_rate_limited",
+      "latency_ms": 3266.5
+    }
+  ]
+}

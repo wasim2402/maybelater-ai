@@ -25,7 +25,7 @@ from app.core.time import utc_now
 from app.models import Category, Intention, IntentionAnalysis
 from app.models.enums import ActivityType, AnalysisRunStatus, AnalysisStatus, FieldState
 from app.services.activity import record_activity
-from app.services.ai.prompts import PROMPT_VERSION, PageMetadata, build_system_prompt, build_user_input
+from app.services.ai.prompts import PageMetadata
 from app.services.ai.provider import AIProvider, get_ai_provider
 from app.services.ai.schemas import IntentionAnalysisOutput
 from app.services.page_metadata import fetch_page_metadata
@@ -83,30 +83,18 @@ async def apply_suggestions(session: AsyncSession, intention: Intention, output:
     return applied
 
 
-async def _category_slugs(session: AsyncSession, intention: Intention) -> list[str]:
-    rows = await session.execute(
-        select(Category.slug).where(or_(Category.user_id.is_(None), Category.user_id == intention.user_id)).order_by(Category.slug)
-    )
-    return list(rows.scalars().all())
-
-
 def make_capture_analyzer(provider: AIProvider, fetch_metadata: MetadataFetcher = fetch_page_metadata) -> Analyzer:
+    """The analysis step used after capture: the Capture Understanding Agent (app/agents)."""
+    from app.agents.capture_understanding import CaptureUnderstandingAgent
+    from app.agents.tools import ToolContext
+
+    agent = CaptureUnderstandingAgent(provider, fetch_metadata)
+
     async def analyze(session: AsyncSession, intention: Intention, run: IntentionAnalysis) -> None:
-        metadata = await fetch_metadata(intention.original_url) if intention.original_url else None
-        output = await provider.structured(
-            system=build_system_prompt(await _category_slugs(session, intention)),
-            user=build_user_input(
-                source_type=intention.source_type,
-                content=intention.original_content,
-                user_note=intention.user_note,
-                metadata=metadata,
-            ),
-            output=IntentionAnalysisOutput,
-        )
-        # Record the model that actually answered (the fallback, when the main model was overloaded).
-        run.provider, run.model, run.prompt_version = provider.name, getattr(provider, "last_model", provider.model), PROMPT_VERSION
-        run.output = output.model_dump(mode="json")
-        await apply_suggestions(session, intention, output)
+        ctx = ToolContext(session=session, user_id=intention.user_id, agent=agent.name)
+        result = await agent.run(ctx, intention.id)
+        run.provider, run.model, run.prompt_version = result.provider, result.model, result.prompt_version
+        run.output = result.output.model_dump(mode="json")
 
     return analyze
 

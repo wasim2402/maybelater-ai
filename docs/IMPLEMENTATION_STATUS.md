@@ -11,7 +11,7 @@ Update this file after each numbered implementation stage. Stage documents live 
 | 05 | `05_AUTH_AND_USER_ACCOUNTS.md` | Done | `docs/AUTH.md`; Better Auth (web) + EdDSA JWT verified by FastAPI via JWKS; protected `/app`, settings, sign-out, account deletion; e2e passing at 1440 and 390 |
 | 06 | `06_CAPTURE_AND_INBOX_FEATURE.md` | Done | `docs/CAPTURE.md`; capture with idempotent retries and duplicate links, inbox with filters and pagination, detail and edit, done, archive and delete; analysis as a separate step |
 | 07 | `07_AI_UNDERSTANDING_FEATURE.md` | Done | `docs/AI.md`; OpenAI structured outputs behind the provider boundary, SSRF-safe page metadata, suggestions that never overwrite user decisions, review UI with keep, edit, dismiss and retry. Live OpenAI call not verified (no key). |
-| 08 | `08_AI_AGENTS_AND_TOOLS.md` | Not started | |
+| 08 | `08_AI_AGENTS_AND_TOOLS.md` | Done | `docs/AGENTS.md`; Capture Understanding Agent with 3 narrow, audited tools; later agents documented only; evaluation set and live run (12/12 passed) |
 | 09 | `09_ORGANIZATION_AND_SEARCH.md` | Not started | |
 | 10 | `10_SMART_RESURFACING_ENGINE.md` | Not started | |
 | 11 | `11_REMINDERS_AND_NOTIFICATIONS.md` | Not started | |
@@ -252,3 +252,32 @@ Update this file after each numbered implementation stage. Stage documents live 
   - Backend `pytest`: 164 passed (9 new fallback tests).
   - `scripts/check_ai.py` live: validated suggestions for a text note and two links, answered by the fallback while 3.8 was busy.
 - **Note:** run scripts with the project's virtual environment (`.venv\Scripts\Activate.ps1`, or `.venv\Scripts\python.exe`). The system Python lacks the packages, which caused the earlier `No module named 'pydantic_settings'` error.
+
+### 2026-11-21 — Stage 08
+- **Stage:** 08 — AI Agents and Tools
+- **Summary:**
+  - The Capture Understanding Agent (`app/agents/capture_understanding.py`) is a deterministic workflow with exactly three typed tools (`app/agents/tools.py`):
+    - `read_captured_item` (read, owned items only, minimum data);
+    - `read_page_metadata` (read, the item's own link only);
+    - `save_suggestions` (write, validated output only, undecided fields only).
+  - Every tool derives the user from the server context and writes a content-free audit line. Each run logs its outcome, the model that answered, prompt and schema versions, fields written, confidence and per-step timings.
+  - The post-capture analysis now runs through the agent. There are no delete, publish, reminder or SQL tools; a test enforces this.
+  - The Organization, Resurfacing and Personal Search assistants are documented interfaces only. No LangGraph.
+  - Evaluation: 15 synthetic cases (`evals/capture_cases.json`), a tested scorer (`evals/scoring.py`) and a live runner (`scripts/eval_capture.py`) with rate-limit waits.
+  - Fixed `alembic/env.py` (`fileConfig(..., disable_existing_loggers=False)`): migrations run inside a process (tests, tools) were silently disabling the app's loggers.
+- **Files changed:**
+  - `backend/app/agents/{__init__,tools,capture_understanding}.py`
+  - `backend/app/services/analysis.py`
+  - `backend/alembic/env.py`
+  - `backend/evals/{__init__,capture_cases.json,scoring.py}`
+  - `backend/scripts/eval_capture.py`
+  - `backend/tests/test_agents.py`
+  - `docs/AGENTS.md`
+- **Validation:**
+  - Backend `pytest`: 176 passed (12 new).
+  - Live evaluation against Gemini: 12 of 15 cases answered, all 12 passed (category, title and resurface 100%, 0 hallucinations, direct injection resisted, low confidence on vague input), all via the fallback `gemini-2.5-flash`.
+- **Known issues:**
+  1. The key is on the **free tier: 20 requests per day per model**. Today's `gemini-2.5-flash` allowance is used up, and resets in about 22 h. Until then, and whenever `gemini-3.8-flash` is overloaded, analyses fail with `provider_rate_limited` and items show "No suggestions" with a retry. Capture is unaffected. Enable billing for real use.
+  2. Three evaluation cases (`shoes-race`, `injection-fence`, `bare-domain`) have not been run live yet, because of the quota.
+  3. `evals/last_run.json` holds the second, quota-limited run (5 cases); the full results are recorded above and in `docs/AGENTS.md`.
+- **Next stage:** 09 — `09_ORGANIZATION_AND_SEARCH.md` (not started).
