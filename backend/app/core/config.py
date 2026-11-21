@@ -8,7 +8,7 @@ from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
 class Settings(BaseSettings):
     """Application settings loaded from environment variables / backend/.env.
 
-    Secrets (database password, OpenAI key, auth secret) live only here, never in the web app.
+    Secrets (database password, Gemini API key) live only here, never in the web app.
     """
 
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
@@ -23,8 +23,13 @@ class Settings(BaseSettings):
     database_url: str = "postgresql+asyncpg://maybelater@localhost:5432/maybelater"
     test_database_url: str = ""
 
-    openai_api_key: str = ""
-    openai_model: str = ""
+    # AI suggestions via Google Gemini. Leave the key empty to run without them.
+    gemini_api_key: str = ""
+    gemini_model: str = "gemini-3.8-flash"
+    # Used when the main model is overloaded, times out or is out of quota. Empty turns fallback off.
+    gemini_fallback_model: str = "gemini-2.5-flash"
+    # How long the main model gets before the fallback takes over (only when a fallback is set).
+    gemini_main_timeout_seconds: float = 15.0
     ai_timeout_seconds: float = 30.0
 
     # Sessions are issued by Better Auth in the web app. The API verifies its short-lived JWTs with the
@@ -77,7 +82,7 @@ class Settings(BaseSettings):
 
     @property
     def ai_configured(self) -> bool:
-        return bool(self.openai_api_key and self.openai_model)
+        return bool(self.gemini_api_key and self.gemini_model)
 
 
 @lru_cache

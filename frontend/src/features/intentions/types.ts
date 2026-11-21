@@ -33,6 +33,7 @@ export const intentionSchema = z.object({
   archived_at: z.string().nullable(),
   created_at: z.string(),
   updated_at: z.string(),
+  suggestion_confidence: z.number().nullable().optional(),
 });
 
 export const intentionPageSchema = z.object({
@@ -59,11 +60,16 @@ export type StatusFilter = "open" | "completed" | "archived" | "all";
 /** Whether a field's value came from AI and what the user did with it (stage 07 shows these). */
 export type SuggestionState = "suggested" | "accepted" | "edited" | "dismissed";
 
+/** Fields AI can suggest (backend SuggestionField). */
+export type SuggestionKey = "title" | "summary" | "intent" | "category" | "tags" | "resurface_condition";
+
 export interface SuggestedField {
-  key: "title" | "summary" | "reason" | "category" | "resurface";
+  key: SuggestionKey;
   label: string;
   value: string;
   state: SuggestionState;
+  /** Free-text fields can be edited in place; category and tags are edited in the details form. */
+  editable: boolean;
 }
 
 export type IntentionUpdate = Partial<{

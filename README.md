@@ -116,7 +116,7 @@ flowchart TB
         REDIS[("Redis - Optional")]
     end
 
-    LLM["OpenAI API"]
+    LLM["Google Gemini API"]
 
     USER --> WEB
     WEB --> UI
@@ -143,7 +143,7 @@ flowchart TB
 - Python, FastAPI
 - Pydantic, SQLAlchemy 2, Alembic
 - PostgreSQL
-- OpenAI API
+- Google Gemini API (gemini-3.8-flash)
 
 **Infrastructure & Testing**
 - Redis and ARQ (optional background jobs)
@@ -202,7 +202,7 @@ maybelater-ai/
 - npm
 - Python 3.11+
 - PostgreSQL
-- OpenAI API key
+- Google Gemini API key
 
 ### 1. Clone the Repository
 
@@ -257,7 +257,8 @@ NEXT_PUBLIC_API_URL=http://localhost:8000
 APP_ENV=development
 DATABASE_URL=postgresql+psycopg://USER:PASSWORD@localhost:5432/maybelater
 
-OPENAI_API_KEY=your_openai_api_key
+GEMINI_API_KEY=your_gemini_api_key
+GEMINI_MODEL=gemini-3.8-flash
 
 BETTER_AUTH_SECRET=your_secure_secret
 BETTER_AUTH_URL=http://localhost:3000

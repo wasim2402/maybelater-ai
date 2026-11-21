@@ -72,7 +72,7 @@ backend/app/
 ├── models/              SQLAlchemy models (stage 04)
 ├── db/                  engine, session (get_db), Base
 ├── services/            business logic; owns ownership checks and transactions
-│   └── ai/provider.py   AIProvider protocol; the OpenAI implementation arrives in stage 07
+│   └── ai/              provider boundary (Gemini), prompts, validated output schema
 └── core/
     ├── config.py        Settings (env), validation of CORS and production secrets
     ├── errors.py        AppError family + handlers (the shared error body)
@@ -151,7 +151,7 @@ On the web side, `ApiError` (`src/lib/api/errors.ts`) exposes `code`, `message`,
 
 - **Ownership:** enforced in service queries (`WHERE user_id = :current_user`), with the user taken from the `current_user` dependency (a verified bearer token; see `docs/AUTH.md`).
 - **CORS:** known origins only. `*` is rejected at startup, and outside development the origins must use https.
-- **Secrets:** `OPENAI_API_KEY` and `DATABASE_URL` live only in `backend/.env`; `BETTER_AUTH_SECRET` only in `frontend/.env.local` (server side). The API verifies sessions with public keys and holds no auth secret. With `APP_ENV` set to staging or production, it refuses to start unless the auth URLs use https.
+- **Secrets:** `GEMINI_API_KEY` and `DATABASE_URL` live only in `backend/.env`; `BETTER_AUTH_SECRET` only in `frontend/.env.local` (server side). The API verifies sessions with public keys and holds no auth secret. With `APP_ENV` set to staging or production, it refuses to start unless the auth URLs use https.
 - **User links (SSRF):**
   - `validate_capture_url` runs when a link is saved. It allows http(s) only, and rejects credentials in the URL, localhost and `.local`/`.internal` hosts, private, loopback, link-local and metadata IPs, and IPv4-mapped IPv6 tricks.
   - `resolve_public_url` runs right before any server-side fetch (stage 07). It resolves DNS and requires every address to be public.
@@ -172,7 +172,7 @@ Template: `.env.example` at the repository root. Copy browser-safe values into `
 | `APP_ENV` | API | `development`, `test`, `staging` or `production` |
 | `LOG_LEVEL` | API | Default `INFO` |
 | `DATABASE_URL`, `TEST_DATABASE_URL` | API | `postgresql+asyncpg://…` |
-| `OPENAI_API_KEY`, `OPENAI_MODEL` | API | AI features. When unset, those features return 503 and capture still works. |
+| `GEMINI_API_KEY`, `GEMINI_MODEL` | API | AI suggestions (Google Gemini, default model `gemini-3.8-flash`). When the key is unset, those features return 503 and capture still works. |
 | `AUTH_BASE_URL`, `AUTH_JWKS_URL`, `AUTH_AUDIENCE` | API | Token verification with Better Auth's public keys (`docs/AUTH.md`) |
 | `CORS_ORIGINS` | API | JSON list or comma-separated |
 | `MAX_REQUEST_BYTES` | API | Request body cap |

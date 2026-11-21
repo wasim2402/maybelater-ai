@@ -9,11 +9,12 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from app.core.config import Settings
 from app.core.deps import app_settings, current_user, db_session
-from app.core.errors import AppError
+from app.core.errors import AppError, ProviderNotConfiguredError
 from app.core.rate_limit import RateLimit
 from app.db.session import SessionLocal
 from app.models import Category, Intention, User
 from app.schemas.intentions import (
+    AnalyzeRequest,
     CaptureCreate,
     CaptureResult,
     CategoryOut,
@@ -21,9 +22,11 @@ from app.schemas.intentions import (
     IntentionPage,
     IntentionUpdate,
     StatusFilter,
+    SuggestionDecision,
+    SuggestionField,
 )
 from app.services import intentions as service
-from app.services.analysis import initial_analysis_status, run_analysis
+from app.services.analysis import Analyzer, initial_analysis_status, latest_confidence, run_analysis
 from app.services.capture import capture
 
 router = APIRouter(tags=["intentions"])
@@ -71,6 +74,11 @@ def session_factory(request: Request) -> async_sessionmaker[AsyncSession]:
     return getattr(request.app.state, "session_factory", None) or SessionLocal
 
 
+def analyzer(request: Request) -> Analyzer | None:
+    """The analysis step; None means the real provider. Tests inject a fake via app.state."""
+    return getattr(request.app.state, "analyzer", None)
+
+
 @router.post(
     "/captures",
     response_model=CaptureResult,
@@ -86,6 +94,7 @@ async def create_capture(
     session: AsyncSession = Depends(db_session),
     settings: Settings = Depends(app_settings),
     factory: async_sessionmaker[AsyncSession] = Depends(session_factory),
+    run_with: Analyzer | None = Depends(analyzer),
 ) -> CaptureResult:
     result, item = await capture(
         session,
@@ -97,7 +106,7 @@ async def create_capture(
     )
     if result == "created":
         if item.analysis_status == "pending":
-            background.add_task(run_analysis, factory, item.id, user.id)
+            background.add_task(run_analysis, factory, item.id, user.id, run_with)
     else:
         response.status_code = status.HTTP_200_OK
     return CaptureResult(result=result, item=to_out(item))
@@ -120,7 +129,9 @@ async def list_intentions(
 
 @router.get("/intentions/{intention_id}", response_model=IntentionOut)
 async def read_intention(intention_id: UUID, user: User = Depends(current_user), session: AsyncSession = Depends(db_session)) -> IntentionOut:
-    return to_out(await service.get_intention(session, user, intention_id))
+    out = to_out(await service.get_intention(session, user, intention_id))
+    out.suggestion_confidence = await latest_confidence(session, intention_id)
+    return out
 
 
 @router.patch("/intentions/{intention_id}", response_model=IntentionOut)
@@ -139,3 +150,43 @@ async def delete_intention(intention_id: UUID, user: User = Depends(current_user
 @router.get("/categories", response_model=list[CategoryOut], tags=["categories"])
 async def list_categories(user: User = Depends(current_user), session: AsyncSession = Depends(db_session)) -> list[CategoryOut]:
     return [c for c in (category_out(cat) for cat in await service.list_categories(session, user)) if c]
+
+
+@router.post(
+    "/intentions/{intention_id}/suggestions/{field}",
+    response_model=IntentionOut,
+    responses={409: {"description": "That field holds no suggestion"}},
+)
+async def decide_suggestion(
+    intention_id: UUID,
+    field: SuggestionField,
+    body: SuggestionDecision,
+    user: User = Depends(current_user),
+    session: AsyncSession = Depends(db_session),
+) -> IntentionOut:
+    return to_out(await service.decide_suggestion(session, user, intention_id, field, body.action))
+
+
+@router.post(
+    "/ai/analyze",
+    response_model=IntentionOut,
+    status_code=status.HTTP_202_ACCEPTED,
+    tags=["ai"],
+    dependencies=[Depends(RateLimit("analyze", limit=10, window_seconds=60))],
+)
+async def analyze(
+    body: AnalyzeRequest,
+    background: BackgroundTasks,
+    user: User = Depends(current_user),
+    session: AsyncSession = Depends(db_session),
+    settings: Settings = Depends(app_settings),
+    factory: async_sessionmaker[AsyncSession] = Depends(session_factory),
+    run_with: Analyzer | None = Depends(analyzer),
+) -> IntentionOut:
+    """Starts (or retries) AI analysis for one item. Returns at once with analysis_status `pending`;
+    poll GET /intentions/{id} for the result. Fields the user decided on are never overwritten."""
+    if not settings.ai_configured:
+        raise ProviderNotConfiguredError("Suggestions are not switched on for this app yet.")
+    item = await service.request_reanalysis(session, user, body.intention_id)
+    background.add_task(run_analysis, factory, item.id, user.id, run_with)
+    return to_out(item)

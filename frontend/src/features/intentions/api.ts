@@ -16,6 +16,7 @@ import {
   type IntentionPage,
   type IntentionUpdate,
   type StatusFilter,
+  type SuggestionKey,
 } from "./types";
 
 export const intentionKeys = {
@@ -26,8 +27,13 @@ export const intentionKeys = {
 
 const PAGE_SIZE = 20;
 
+const POLL_MS = 2_500;
+
 export function useIntentions(status: StatusFilter) {
   return useInfiniteQuery({
+    // While any visible item is still being read, check again shortly so suggestions appear by themselves.
+    refetchInterval: (query) =>
+      query.state.data?.pages.some((p) => p.items.some((i) => i.analysis_status === "pending")) ? POLL_MS : false,
     queryKey: intentionKeys.list(status),
     initialPageParam: null as string | null,
     queryFn: ({ pageParam, signal }) =>
@@ -40,6 +46,7 @@ export function useIntention(id: string) {
   return useQuery({
     queryKey: intentionKeys.detail(id),
     queryFn: ({ signal }) => api.get(`/intentions/${id}`, { schema: intentionSchema, signal }),
+    refetchInterval: (query) => (query.state.data?.analysis_status === "pending" ? POLL_MS : false),
   });
 }
 
@@ -83,7 +90,10 @@ export function useUpdateIntention() {
     mutationFn: ({ id, update }: { id: string; update: IntentionUpdate }) =>
       api.patch(`/intentions/${id}`, update, { schema: intentionSchema }),
     onSuccess: (item, { update }) => {
-      queryClient.setQueryData(intentionKeys.detail(item.id), item);
+      queryClient.setQueryData(intentionKeys.detail(item.id), (old: Intention | undefined) => ({
+        ...item,
+        suggestion_confidence: item.suggestion_confidence ?? old?.suggestion_confidence ?? null,
+      }));
       replaceInLists(queryClient, item);
       // A status change moves the item between filter tabs.
       if (update.status) void queryClient.invalidateQueries({ queryKey: ["intentions", "list"] });
@@ -101,5 +111,35 @@ export function useDeleteIntention() {
         data ? { ...data, pages: data.pages.map((p) => ({ ...p, items: p.items.filter((i) => i.id !== id) })) } : data,
       );
     },
+  });
+}
+
+function useStoreItem() {
+  const queryClient = useQueryClient();
+  return (item: Intention) => {
+    queryClient.setQueryData(intentionKeys.detail(item.id), (old: Intention | undefined) => ({
+      ...item,
+      suggestion_confidence: item.suggestion_confidence ?? old?.suggestion_confidence ?? null,
+    }));
+    replaceInLists(queryClient, item);
+  };
+}
+
+/** Keep or dismiss one AI suggestion. */
+export function useDecideSuggestion() {
+  const store = useStoreItem();
+  return useMutation({
+    mutationFn: ({ id, field, action }: { id: string; field: SuggestionKey; action: "accept" | "dismiss" }) =>
+      api.post(`/intentions/${id}/suggestions/${field}`, { action }, { schema: intentionSchema }),
+    onSuccess: store,
+  });
+}
+
+/** Ask for suggestions again (after a failure, or for fresh ones). Decided fields are never overwritten. */
+export function useAnalyze() {
+  const store = useStoreItem();
+  return useMutation({
+    mutationFn: (id: string) => api.post("/ai/analyze", { intention_id: id }, { schema: intentionSchema }),
+    onSuccess: store,
   });
 }

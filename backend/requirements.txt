@@ -6,7 +6,7 @@ sqlalchemy[asyncio]
 asyncpg
 alembic
 httpx
-openai
+google-genai
 tenacity
 python-multipart
 PyJWT[crypto]

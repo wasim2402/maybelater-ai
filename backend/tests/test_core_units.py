@@ -108,6 +108,6 @@ def test_production_requires_https_auth() -> None:
 
 
 def test_unconfigured_ai_provider_raises_clear_error() -> None:
-    provider = get_ai_provider(Settings(openai_api_key="", openai_model="", _env_file=None))  # type: ignore[call-arg]
+    provider = get_ai_provider(Settings(gemini_api_key="", _env_file=None))  # type: ignore[call-arg]
     with pytest.raises(ProviderNotConfiguredError):
         asyncio.run(provider.structured(system="s", user="u", output=Settings))

@@ -73,6 +73,26 @@ class IntentionOut(BaseModel):
     archived_at: datetime | None
     created_at: datetime
     updated_at: datetime
+    # Detail view only: how well the source supported the last suggestions (0-1). A hint, not a guarantee.
+    suggestion_confidence: float | None = None
+
+
+class AnalyzeRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    intention_id: UUID
+
+
+SuggestionField = Literal["title", "summary", "intent", "category", "tags", "resurface_condition"]
+
+
+class SuggestionDecision(BaseModel):
+    """`accept` keeps the suggested value as the user's own; `dismiss` removes it, and it will not be
+    suggested again."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    action: Literal["accept", "dismiss"]
 
 
 class CaptureResult(BaseModel):

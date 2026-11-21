@@ -11,7 +11,7 @@ from sqlalchemy import Select, and_, delete, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from app.core.errors import NotFoundError
+from app.core.errors import ConflictError, NotFoundError
 from app.core.time import utc_now
 from app.models import Category, Intention, User
 from app.models.enums import ActivityType, FieldState, IntentionStatus
@@ -139,3 +139,38 @@ async def delete_intention(session: AsyncSession, user: User, intention_id: uuid
 async def list_categories(session: AsyncSession, user: User) -> list[Category]:
     query = select(Category).where(or_(Category.user_id.is_(None), Category.user_id == user.id)).order_by(Category.user_id.is_not(None), Category.name)
     return list((await session.execute(query)).scalars().all())
+
+
+async def decide_suggestion(session: AsyncSession, user: User, intention_id: uuid.UUID, field: str, action: str) -> Intention:
+    """Accept or dismiss one AI suggestion. Only a field currently in the `suggested` state qualifies."""
+    item = await get_intention(session, user, intention_id)
+    states = dict(item.field_states or {})
+    if states.get(field) != FieldState.SUGGESTED.value:
+        raise ConflictError("There is no suggestion to decide on for that field.")
+    if action == "accept":
+        states[field] = FieldState.ACCEPTED.value
+    else:
+        states[field] = FieldState.DISMISSED.value
+        if field == "category":
+            item.category_id = None
+        elif field == "tags":
+            item.tags = []
+        else:
+            setattr(item, field, None)
+    item.field_states = states
+    await record_activity(session, user.id, ActivityType.EDITED, item.id, fields=field, decision=action)
+    await session.commit()
+    session.expire(item)
+    return await get_intention(session, user, intention_id)
+
+
+async def request_reanalysis(session: AsyncSession, user: User, intention_id: uuid.UUID) -> Intention:
+    """Marks an item for analysis again (retry after a failure, or fresh suggestions). Decided fields
+    stay as they are: analysis only writes fields still open to suggestion."""
+    item = await get_intention(session, user, intention_id)
+    if item.analysis_status == "pending":
+        raise ConflictError("Suggestions are already being prepared for this item.")
+    item.analysis_status = "pending"
+    await session.commit()
+    session.expire(item)
+    return await get_intention(session, user, intention_id)

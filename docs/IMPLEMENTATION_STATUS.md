@@ -10,7 +10,7 @@ Update this file after each numbered implementation stage. Stage documents live 
 | 04 | `04_DATABASE_AND_DATA_MODELS.md` | Done | `docs/DATA_MODEL.md`; 6 tables, initial migration `08f4688f0da9` with 9 system categories; ownership, consent and deletion enforced by the database |
 | 05 | `05_AUTH_AND_USER_ACCOUNTS.md` | Done | `docs/AUTH.md`; Better Auth (web) + EdDSA JWT verified by FastAPI via JWKS; protected `/app`, settings, sign-out, account deletion; e2e passing at 1440 and 390 |
 | 06 | `06_CAPTURE_AND_INBOX_FEATURE.md` | Done | `docs/CAPTURE.md`; capture with idempotent retries and duplicate links, inbox with filters and pagination, detail and edit, done, archive and delete; analysis as a separate step |
-| 07 | `07_AI_UNDERSTANDING_FEATURE.md` | Not started | |
+| 07 | `07_AI_UNDERSTANDING_FEATURE.md` | Done | `docs/AI.md`; OpenAI structured outputs behind the provider boundary, SSRF-safe page metadata, suggestions that never overwrite user decisions, review UI with keep, edit, dismiss and retry. Live OpenAI call not verified (no key). |
 | 08 | `08_AI_AGENTS_AND_TOOLS.md` | Not started | |
 | 09 | `09_ORGANIZATION_AND_SEARCH.md` | Not started | |
 | 10 | `10_SMART_RESURFACING_ENGINE.md` | Not started | |
@@ -201,3 +201,54 @@ Update this file after each numbered implementation stage. Stage documents live 
   2. Search, tag and category filters on the list come in stage 09.
   3. Snooze and resurfacing come in stage 10.
 - **Next stage:** 07 — `07_AI_UNDERSTANDING_FEATURE.md` (not started).
+
+### 2026-11-21 — Stage 07
+- **Stage:** 07 — AI Understanding
+- **Summary:**
+  - A validated `IntentionAnalysisOutput` (title, summary, intent, category, tags, resurface condition, confidence) and a versioned prompt (`capture-understanding-v1`) that fences captured content as untrusted data.
+  - `OpenAIProvider` uses `responses.parse` with a Pydantic `text_format` and `store=False`, retries only transient failures, and maps errors to codes.
+  - SSRF-safe page metadata for links: every hop is checked, with time, size and HTML limits, and the body is never stored.
+  - `run_analysis` records the provider, model, prompt version and output, and applies suggestions only to fields whose state is absent or `suggested`.
+  - `POST /ai/analyze` (retry or refresh), accept or dismiss per suggestion, and confidence on the detail view.
+  - Web: suggestions panel (keep, edit, not this), a self-refreshing pending state, retry on failure, a rough-guesses note for low confidence, and an inbox that refreshes while items are pending.
+- **Files changed:**
+  - Backend:
+    - `app/services/ai/{schemas,prompts,provider}.py`
+    - `app/services/{page_metadata,analysis,intentions}.py`
+    - `app/schemas/intentions.py`, `app/api/routes/intentions.py`
+    - `tests/test_ai.py`; `tests/test_capture.py` (injected analyzer, no network)
+  - Frontend:
+    - `src/features/intentions/{types,api,suggestions,suggestions.test}.ts`
+    - `src/features/ai/ai-suggestion-panel.tsx` and its test
+    - `src/app/(app)/app/items/[id]/item-detail.tsx`
+  - Shared: `.env.example`, `docs/AI.md`
+- **Validation:**
+  - Backend `pytest`: 152 passed (28 new).
+  - Frontend: lint and typecheck pass; `vitest` 35 passed; `next build` passes.
+- **Known issues:**
+  1. No `OPENAI_API_KEY` is configured here, so the real OpenAI call is untested live; every behaviour is covered with mocked responses. Set the key and model to try it.
+  2. DNS-rebinding hardening (pinning the connection to the checked IP) for metadata fetches is deferred to stage 14.
+  3. Items captured while AI was off are not analysed automatically later.
+- **Next stage:** 08 — `08_AI_AGENTS_AND_TOOLS.md` (not started).
+
+### 2026-11-21 — Change: AI provider switched from OpenAI to Google Gemini (requested)
+- **Summary:** Replaced `OpenAIProvider` with `GeminiProvider` (`google-genai` 2.34.0) behind the same `AIProvider` boundary.
+  - It uses structured JSON output with a response schema, then strict validation; a per-attempt deadline; retries for timeouts, connection errors, 429 and 5xx only; and the same error codes as before.
+  - Settings `OPENAI_API_KEY`/`OPENAI_MODEL` became `GEMINI_API_KEY`/`GEMINI_MODEL` (default `gemini-3.8-flash`); the startup panel shows "Gemini <model>".
+  - Removed the `openai` dependency and added `httpx2` to the dev requirements, since Starlette's TestClient needs it. Added `backend/scripts/check_ai.py` for a live check.
+  - This overrides `TECH_STACK_MAYBELATER.md` ("OpenAI API"), at the user's request.
+- **Files changed:**
+  - `backend/app/services/ai/provider.py`, `backend/app/core/{config,startup}.py`, `backend/app/services/ai/schemas.py`
+  - `backend/requirements.txt`, `requirements-dev.txt`, `requirements.lock.txt`
+  - `backend/tests/{test_ai,test_capture,test_core_units}.py`, `backend/scripts/check_ai.py`
+  - `backend/.env` (placeholder names only), `.env.example`
+  - `docs/{AI,ARCHITECTURE}.md`, `README.md`
+- **Validation:** backend `pytest` 155 passed (provider tests rewritten against a mocked Gemini client). Live Gemini call not yet run: `GEMINI_API_KEY` is empty.
+
+### 2026-11-21 — Gemini live check and fallback model
+- **Live check:** the key authenticates and `gemini-3.8-flash` is listed for it, but it, and every other 3.x Flash model, returned 504 DEADLINE_EXCEEDED or 503 "high demand" during testing. `gemini-2.5-flash` answered in about 2 s.
+- **Change (user's choice):** `gemini-3.8-flash` stays the main model, with a 15 s deadline. On overload, deadline or quota (503, 504, timeout, 429), the request goes to `GEMINI_FALLBACK_MODEL` (default `gemini-2.5-flash`), and each run records the model that answered. Configuration errors and malformed answers do not fall back.
+- **Validation:**
+  - Backend `pytest`: 164 passed (9 new fallback tests).
+  - `scripts/check_ai.py` live: validated suggestions for a text note and two links, answered by the fallback while 3.8 was busy.
+- **Note:** run scripts with the project's virtual environment (`.venv\Scripts\Activate.ps1`, or `.venv\Scripts\python.exe`). The system Python lacks the packages, which caused the earlier `No module named 'pydantic_settings'` error.

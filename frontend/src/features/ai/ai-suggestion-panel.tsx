@@ -15,6 +15,10 @@ interface AiSuggestionPanelProps {
   onEdit: (key: SuggestedField["key"], value: string) => void;
   onDismiss: (key: SuggestedField["key"]) => void;
   onRetry?: () => void;
+  /** Disables actions while a decision is being saved. */
+  busy?: boolean;
+  /** The source said little (a bare link, a short note): show a gentle "rough guesses" note. */
+  lowConfidence?: boolean;
   className?: string;
 }
 
@@ -30,6 +34,8 @@ export function AiSuggestionPanel({
   onEdit,
   onDismiss,
   onRetry,
+  busy = false,
+  lowConfidence = false,
   className,
 }: AiSuggestionPanelProps) {
   const visible = fields.filter((f) => f.state !== "dismissed");
@@ -43,6 +49,13 @@ export function AiSuggestionPanel({
         </h2>
         <span className="text-[13px] text-muted-foreground">You decide what to keep</span>
       </header>
+      {analysis === "ready" && visible.length > 0 ? (
+        <p className="mb-3 text-[13px] text-muted-foreground">
+          {lowConfidence
+            ? "These are rough guesses from very little to go on. Keep, edit or drop each one."
+            : "Suggested from what you saved. Nothing changes until you keep it."}
+        </p>
+      ) : null}
 
       {analysis === "pending" ? (
         <p role="status" className="flex items-center gap-2 rounded-lg bg-sage-soft/60 px-3 py-3 text-[15px]">
@@ -53,7 +66,7 @@ export function AiSuggestionPanel({
         <div role="alert" className="space-y-2 rounded-lg border border-dashed border-line px-3 py-3 text-[15px]">
           <p>Suggestions could not be made this time. Your item is saved as you wrote it.</p>
           {onRetry ? (
-            <Button size="sm" variant="outline" onClick={onRetry}>
+            <Button size="sm" variant="outline" onClick={onRetry} disabled={busy}>
               Try suggestions again
             </Button>
           ) : null}
@@ -61,11 +74,18 @@ export function AiSuggestionPanel({
       ) : analysis === "off" ? (
         <p className="text-[15px] text-muted-foreground">Suggestions are turned off for this item.</p>
       ) : visible.length === 0 ? (
-        <p className="text-[15px] text-muted-foreground">No suggestions left to review.</p>
+        <div className="space-y-2">
+          <p className="text-[15px] text-muted-foreground">No suggestions left to review.</p>
+          {onRetry ? (
+            <Button size="sm" variant="ghost" onClick={onRetry} disabled={busy}>
+              Suggest again
+            </Button>
+          ) : null}
+        </div>
       ) : (
         <ul className="space-y-2.5">
           {visible.map((field) => (
-            <SuggestionRow key={field.key} field={field} onAccept={onAccept} onEdit={onEdit} onDismiss={onDismiss} />
+            <SuggestionRow key={field.key} field={field} busy={busy} onAccept={onAccept} onEdit={onEdit} onDismiss={onDismiss} />
           ))}
         </ul>
       )}
@@ -75,11 +95,13 @@ export function AiSuggestionPanel({
 
 function SuggestionRow({
   field,
+  busy,
   onAccept,
   onEdit,
   onDismiss,
 }: {
   field: SuggestedField;
+  busy: boolean;
   onAccept: AiSuggestionPanelProps["onAccept"];
   onEdit: AiSuggestionPanelProps["onEdit"];
   onDismiss: AiSuggestionPanelProps["onDismiss"];
@@ -141,23 +163,26 @@ function SuggestionRow({
       {!editing ? (
         <div className="mt-2 flex flex-wrap gap-1">
           {!confirmed ? (
-            <Button size="sm" variant="outline" className="h-9 bg-card" onClick={() => onAccept(field.key)}>
+            <Button size="sm" variant="outline" className="h-9 bg-card" disabled={busy} onClick={() => onAccept(field.key)}>
               <Check aria-hidden /> Keep
             </Button>
           ) : null}
-          <Button
-            size="sm"
-            variant="ghost"
-            className="h-9"
-            onClick={() => {
-              setDraft(field.value);
-              setEditing(true);
-            }}
-          >
-            <Pencil aria-hidden /> Edit
-          </Button>
+          {field.editable ? (
+            <Button
+              size="sm"
+              variant="ghost"
+              className="h-9"
+              disabled={busy}
+              onClick={() => {
+                setDraft(field.value);
+                setEditing(true);
+              }}
+            >
+              <Pencil aria-hidden /> Edit
+            </Button>
+          ) : null}
           {!confirmed ? (
-            <Button size="sm" variant="ghost" className="h-9" onClick={() => onDismiss(field.key)}>
+            <Button size="sm" variant="ghost" className="h-9" disabled={busy} onClick={() => onDismiss(field.key)}>
               <X aria-hidden /> Not this
             </Button>
           ) : null}

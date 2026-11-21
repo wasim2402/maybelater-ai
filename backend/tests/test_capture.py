@@ -241,7 +241,11 @@ def test_delete_removes_the_item(client: TestClient) -> None:
 
 @pytest.fixture
 def ai_client(db_url: str) -> Iterator[TestClient]:
-    with api_client(db_url, openai_api_key="sk-test", openai_model="test-model") as test_client:
+    with api_client(db_url, gemini_api_key="test-key", gemini_model="gemini-test") as test_client:
+        async def unavailable(session, intention, analysis_run):
+            raise ProviderError()  # never call the real provider from tests
+
+        test_client.app.state.analyzer = unavailable
         yield test_client
 
 

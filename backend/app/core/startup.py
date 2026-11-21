@@ -4,7 +4,7 @@
     ──────────────────────────────────────────────────────────────
     ●  Database     connected · PostgreSQL 18.4 · migration 08f4688f0da9
     ●  Sign-in      keys reachable · http://localhost:3000/api/auth/jwks
-    ○  AI           not configured · set OPENAI_API_KEY and OPENAI_MODEL
+    ○  AI           not configured · set GEMINI_API_KEY
     ●  CORS         http://localhost:3000
        API          http://127.0.0.1:8000/api/v1
        Docs         http://127.0.0.1:8000/docs
@@ -68,8 +68,9 @@ async def check_auth_keys(settings: Settings) -> Check:
 
 def ai_check(settings: Settings) -> Check:
     if settings.ai_configured:
-        return Check("AI", "ok", f"configured · model {settings.openai_model}")
-    return Check("AI", "off", "not configured · set OPENAI_API_KEY and OPENAI_MODEL")
+        fallback = f" · fallback {settings.gemini_fallback_model}" if settings.gemini_fallback_model else ""
+        return Check("AI", "ok", f"configured · Gemini {settings.gemini_model}{fallback}")
+    return Check("AI", "off", "not configured · set GEMINI_API_KEY")
 
 
 def public_base(settings: Settings) -> str:

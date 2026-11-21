@@ -1,7 +1,7 @@
 "use client";
 
 import { format } from "date-fns";
-import { AlertCircle, Archive, ArchiveRestore, ArrowLeft, CheckCircle2, ExternalLink, RotateCcw, Sparkles, Trash2 } from "lucide-react";
+import { Archive, ArchiveRestore, ArrowLeft, CheckCircle2, ExternalLink, RotateCcw, Sparkles, Trash2 } from "lucide-react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { useId, useState } from "react";
@@ -12,10 +12,19 @@ import { ErrorState, ListSkeleton, SuccessNote } from "@/components/feedback/sta
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { useCategories, useDeleteIntention, useIntention, useUpdateIntention } from "@/features/intentions/api";
+import { AiSuggestionPanel } from "@/features/ai/ai-suggestion-panel";
+import {
+  useAnalyze,
+  useCategories,
+  useDecideSuggestion,
+  useDeleteIntention,
+  useIntention,
+  useUpdateIntention,
+} from "@/features/intentions/api";
 import { displayTitle } from "@/features/intentions/intention-row";
 import { CategoryLabel, StatusLabel } from "@/features/intentions/labels";
-import type { Intention, IntentionUpdate } from "@/features/intentions/types";
+import { suggestedFields } from "@/features/intentions/suggestions";
+import type { Intention, IntentionUpdate, SuggestionKey } from "@/features/intentions/types";
 import { ApiError } from "@/lib/api/errors";
 
 export function ItemDetail() {
@@ -124,9 +133,11 @@ function Loaded({ item }: { item: Intention }) {
         )}
       </section>
 
-      <AnalysisNote state={item.analysis_status} />
+      <Suggestions item={item} />
 
-      <EditForm item={item} />
+      {/* Re-mounts when the item changes on the server (suggestions arrived, one was dismissed), so the
+          form never shows stale values. */}
+      <EditForm key={item.updated_at} item={item} />
 
       <ConfirmDialog
         open={confirmDelete}
@@ -149,19 +160,35 @@ function Loaded({ item }: { item: Intention }) {
   );
 }
 
-function AnalysisNote({ state }: { state: Intention["analysis_status"] }) {
-  if (state === "ready") return null;
-  const content = {
-    pending: { icon: Sparkles, text: "Reading what you saved to suggest a title and why it matters. Your item is already safe." },
-    failed: { icon: AlertCircle, text: "Suggestions could not be made this time. Your item is saved exactly as you wrote it." },
-    off: { icon: Sparkles, text: "Suggestions are not switched on yet. Add your own title and reason below." },
-  }[state];
-  const Icon = content.icon;
+function Suggestions({ item }: { item: Intention }) {
+  const decide = useDecideSuggestion();
+  const update = useUpdateIntention();
+  const analyze = useAnalyze();
+
+  if (item.analysis_status === "off") {
+    return (
+      <p className="flex items-start gap-2.5 rounded-lg bg-sage-soft/50 px-4 py-3 text-[15px]">
+        <Sparkles aria-hidden className="mt-0.5 size-4 shrink-0 text-sage-deep" />
+        Suggestions are not switched on yet. Add your own title and reason below.
+      </p>
+    );
+  }
+
+  const fail = (e: Error) => toast.error(e.message);
+  const busy = decide.isPending || update.isPending || analyze.isPending;
+  const confidence = item.suggestion_confidence;
+
   return (
-    <p role="status" className="flex items-start gap-2.5 rounded-lg bg-sage-soft/50 px-4 py-3 text-[15px]">
-      <Icon aria-hidden className={state === "pending" ? "mt-0.5 size-4 shrink-0 animate-pulse text-sage-deep" : "mt-0.5 size-4 shrink-0 text-sage-deep"} />
-      {content.text}
-    </p>
+    <AiSuggestionPanel
+      fields={suggestedFields(item)}
+      analysis={item.analysis_status}
+      busy={busy}
+      lowConfidence={confidence != null && confidence < 0.5}
+      onAccept={(field) => decide.mutate({ id: item.id, field: field as SuggestionKey, action: "accept" }, { onError: fail })}
+      onDismiss={(field) => decide.mutate({ id: item.id, field: field as SuggestionKey, action: "dismiss" }, { onError: fail })}
+      onEdit={(field, value) => update.mutate({ id: item.id, update: { [field]: value } }, { onError: fail })}
+      onRetry={() => analyze.mutate(item.id, { onError: fail })}
+    />
   );
 }
 
