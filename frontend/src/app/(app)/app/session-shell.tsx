@@ -7,6 +7,7 @@ import { toast } from "sonner";
 import { APP_NAV, AppShell } from "@/components/app-shell/app-shell";
 import type { CaptureInput } from "@/features/capture/capture-schema";
 import { useCapture } from "@/features/intentions/api";
+import { useReminderAlerts } from "@/features/reminders/use-reminder-alerts";
 import { useRecommendations } from "@/features/resurfacing/api";
 import { setUnauthenticatedHandler } from "@/lib/api/client";
 import type { SessionUser } from "@/lib/auth/server";
@@ -25,9 +26,17 @@ export function SessionShell({ user, children }: { user: SessionUser; children: 
   const [captureOpen, setCaptureOpen] = useState(false);
   const recommendations = useRecommendations();
   const resurfacedCount = recommendations.data?.items.length ?? 0;
+  const dueCount = useReminderAlerts();
   const nav = useMemo(
-    () => APP_NAV.map((n) => (n.href === "/app/resurfaced" ? { ...n, count: resurfacedCount || undefined } : n)),
-    [resurfacedCount],
+    () =>
+      APP_NAV.map((n) =>
+        n.href === "/app/resurfaced"
+          ? { ...n, count: resurfacedCount || undefined }
+          : n.href === "/app/reminders"
+            ? { ...n, count: dueCount || undefined }
+            : n,
+      ),
+    [resurfacedCount, dueCount],
   );
 
   useEffect(() => {

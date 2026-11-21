@@ -64,7 +64,7 @@ test("items come back when chosen, and leave when handled", async ({ page }) => 
   // Open the other: once looked at, it leaves the list.
   await list.getByRole("link", { name: "Open" }).click();
   await expect(page).toHaveURL(/\/app\/items\//, { timeout: 30_000 });
-  await expect(page.getByRole("heading", { level: 1 })).toContainText("ramen");
+  await expect(page.getByRole("heading", { level: 1 })).toContainText(/ramen/i);
   await page.getByRole("link", { name: /Resurfaced/ }).first().click();
   await expect(page.getByText("Nothing to look at again right now")).toBeVisible({ timeout: 15_000 });
 

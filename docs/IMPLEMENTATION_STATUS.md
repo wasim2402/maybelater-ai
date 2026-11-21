@@ -13,8 +13,8 @@ Update this file after each numbered implementation stage. Stage documents live 
 | 07 | `07_AI_UNDERSTANDING_FEATURE.md` | Done | `docs/AI.md`; OpenAI structured outputs behind the provider boundary, SSRF-safe page metadata, suggestions that never overwrite user decisions, review UI with keep, edit, dismiss and retry. Live OpenAI call not verified (no key). |
 | 08 | `08_AI_AGENTS_AND_TOOLS.md` | Done | `docs/AGENTS.md`; Capture Understanding Agent with 3 narrow, audited tools; later agents documented only; evaluation set and live run (12/12 passed) |
 | 09 | `09_ORGANIZATION_AND_SEARCH.md` | Done | `docs/SEARCH.md`; PostgreSQL full-text search, combinable filters in the URL, own categories, tag counts; e2e at 1440 and 390 |
-| 10 | `10_SMART_RESURFACING_ENGINE.md` | Not started | |
-| 11 | `11_REMINDERS_AND_NOTIFICATIONS.md` | Not started | |
+| 10 | `10_SMART_RESURFACING_ENGINE.md` | Done | `docs/RESURFACING.md`; pure, deterministic rules engine (date, snooze, confirmed condition, opt-in stale) in the user's time zone; Resurfaced page, bring-it-back, snooze and not-now actions, settings. |
+| 11 | `11_REMINDERS_AND_NOTIFICATIONS.md` | Done | `docs/REMINDERS.md`; reminders confirmed by the user, stored with their zone; delivered once per version by a PostgreSQL-backed worker on the server (SKIP LOCKED, idempotent delivery records, retries with backoff); quiet hours and pause; Reminders page, item panel, settings. Reminders e2e written, not yet run (see below). |
 | 12 | `12_USER_DASHBOARD_AND_SETTINGS.md` | Not started | |
 | 13 | `13_TESTING_AND_QUALITY.md` | Not started | |
 | 14 | `14_DEPLOYMENT_AND_OPERATIONS.md` | Not started | |
@@ -314,3 +314,81 @@ Update this file after each numbered implementation stage. Stage documents live 
   1. Results are ordered newest first, not by relevance, to keep stable keyset pagination. Ranking by relevance can be added as an option later.
   2. Collections and AI-assisted organisation (the Organization Assistant) remain documented interfaces only (`docs/AGENTS.md`).
 - **Next stage:** 10 — `10_SMART_RESURFACING_ENGINE.md` (not started).
+
+### 2026-11-21 — Stage 10
+- **Stage:** 10 — Smart Resurfacing Engine
+- **Summary:**
+  - Pure `evaluate()` (no database, clock or AI) with four signals: chosen date, ended snooze, user-confirmed condition, opt-in stale.
+  - Exclusions (done or archived, still snoozed), 30-day "not now" suppression, a frequency cooldown, a suggestions switch (dates and snoozes always apply), transparent ranking with plain reasons, all in the user's IANA zone with DST-safe presets.
+  - API: `GET /recommendations` (records shown items once per local day) and snooze, unsnooze, dismiss, resurface (bring back on a date, or clear) and viewed. Bookkeeping writes leave `updated_at` alone.
+  - Web: a Resurfaced page with a nav count and actions (open, snooze presets, not now, done with undo); a "Bring it back" control on the item page; "Back …" and "Snoozed until …" on inbox rows; resurfacing settings; a minute-stable `useNow` hook.
+- **Bugs fixed during the stage:**
+  - Reading `updated_at` after recording "shown" caused a lazy load and a 500. Shown and viewed are no longer edits.
+  - An ended snooze was explained as "you asked to see this again" (the most recent instruction now wins).
+  - Two impure clock reads during render, flagged by the React Compiler lint.
+- **Files changed:**
+  - Backend:
+    - `app/services/{resurfacing,recommendations}.py`
+    - `app/api/routes/resurfacing.py`, `app/api/router.py`
+    - `tests/test_resurfacing_{engine,api}.py`
+  - Frontend:
+    - `src/features/resurfacing/{api.ts,when-menu.tsx,bring-back.tsx}`
+    - `src/features/intentions/{types.ts,intention-row.tsx}`
+    - `src/app/(app)/app/resurfaced/*`, `session-shell.tsx`, `items/[id]/item-detail.tsx`, `settings/account-settings.tsx`
+    - `src/components/app-shell/app-shell.tsx`, `src/hooks/use-now.ts`
+    - `e2e/resurfacing.spec.ts`
+  - `docs/RESURFACING.md`
+- **Validation:**
+  - Backend `pytest`: 259 passed (48 new).
+  - Frontend: lint and typecheck pass; `vitest` 40 passed; `next build` passes.
+  - Playwright `e2e/resurfacing.spec.ts` (desktop, Chrome) passed against the live backend. Its title check now ignores case, because AI-generated titles can change capitalisation.
+- **Known issues:**
+  1. The resurfacing e2e takes about 2.5 minutes because it waits for real time to pass (no fake clock in the browser).
+  2. Only a small, explicit condition vocabulary is understood; other conditions are notes. An AI ranking or explanation layer (the Resurfacing Assistant) remains a documented interface (`docs/AGENTS.md`).
+- **Next stage:** 11 — `11_REMINDERS_AND_NOTIFICATIONS.md` (not started).
+
+### 2026-11-21 — Stage 11
+- **Stage:** 11 — Reminders and Notifications
+- **Summary:**
+  - **API:** `POST`, `GET`, `PATCH` (confirm, reschedule, snooze, complete) and `DELETE` (cancel) under `/reminders`.
+  - **Consent:**
+    - `confirm` is required on create; without it the result is a draft, which is never delivered.
+    - The web picker states the exact time and zone before **Set reminder**.
+    - The database refuses an unapproved scheduled reminder, and no agent tool can create one.
+  - **Time:**
+    - Each reminder stores a UTC instant plus the zone the user picked it in.
+    - The web app sends a wall-clock time and the server converts it, refusing times skipped by daylight saving.
+    - Presets are resolved on the server.
+  - **Delivery:**
+    - A PostgreSQL-backed worker runs inside the API (or as `python -m app.worker`) and claims due rows with SKIP LOCKED.
+    - `reminder_deliveries` is unique per (reminder, schedule_version), so a version is never delivered twice.
+    - Retryable failures back off for 1, 5, 15 and 60 minutes, up to 5 attempts; a crash after delivery is repaired without resending.
+    - Delivery pauses while reminders are turned off and waits out quiet hours on the user's clock.
+  - **Channel:** in-app only (email and push deliberately not added).
+  - **Web app:**
+    - A Reminders page (due and coming up) with a nav count and a toast when one comes due.
+    - A Reminder panel on the item page, built on the reworked picker.
+    - Reminder settings: on or off, and quiet hours.
+    - Resurfaced now has its own icon.
+- **Files changed:**
+  - Backend:
+    - `app/models/{reminder,enums,__init__}.py`
+    - Migration `f95d03ffed9f` (`reminder_deliveries`, `schedule_version`, `completed_at`, one open reminder per item)
+    - `app/services/{reminders,reminder_delivery}.py`, `app/api/routes/reminders.py`, `app/api/router.py`
+    - `app/core/{config,startup}.py`, `app/main.py`, `app/worker.py`
+    - `tests/test_reminders_{time,api}.py`, `tests/test_migrations.py`
+  - Frontend:
+    - `src/features/reminders/{api.ts,wall-clock.ts,reminder-picker.tsx,reminder-controls.tsx,item-reminder.tsx,use-reminder-alerts.ts,reminders.test.tsx}`
+    - `src/app/(app)/app/reminders/*`, `session-shell.tsx`, `items/[id]/item-detail.tsx`, `settings/account-settings.tsx`, `resurfaced/resurfaced-list.tsx`
+    - `src/components/app-shell/app-shell.tsx`
+    - `e2e/reminders.spec.ts`
+  - Docs: `docs/REMINDERS.md`, `docs/DATA_MODEL.md`, `docs/ARCHITECTURE.md`
+- **Validation:**
+  - Backend: `pytest` 311 passed (52 new).
+  - Migration applied to the dev database; `alembic check` reports no drift.
+  - Frontend: lint and typecheck pass; `vitest` 45 passed (5 new); `next build` passes (`/app/reminders` is a partial prerender).
+- **Known issues:**
+  1. `e2e/reminders.spec.ts` has not been run yet. The backend on port 8000 was started before this stage (`/api/v1/reminders` returned 404). After restarting it, run `PLAYWRIGHT_CHANNEL=chrome npx playwright test e2e/reminders.spec.ts --project=desktop`. It takes about 3 minutes because it waits for the server to deliver in real time.
+  2. With several reminders due during quiet hours, each pass re-reads them (batch of 100) until the hours end. This is fine at MVP scale; a `deliver_after` column would remove the re-reads.
+  3. The scheduler is PostgreSQL, not Redis with ARQ, which the stage allows as long as it is documented. Revisit when email or push arrive (stage 14).
+- **Next stage:** 12 — `12_USER_DASHBOARD_AND_SETTINGS.md` (not started).

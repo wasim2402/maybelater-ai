@@ -59,6 +59,12 @@ class DeliveryChannel(StrEnum):
     WEB_PUSH = "web_push"  # later
 
 
+class DeliveryStatus(StrEnum):
+    PENDING = "pending"  # attempted, waiting for a retry
+    DELIVERED = "delivered"
+    FAILED = "failed"  # gave up after the last attempt, or a permanent error
+
+
 class ActivityType(StrEnum):
     CAPTURED = "captured"
     ANALYSIS_COMPLETED = "analysis_completed"

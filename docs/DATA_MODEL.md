@@ -13,6 +13,7 @@ erDiagram
     users ||--o{ intention_analyses : owns
     categories |o--o{ intentions : groups
     intentions ||--o{ reminders : has
+    reminders ||--o{ reminder_deliveries : "delivered by"
     intentions ||--o{ intention_analyses : "analysed by"
     intentions |o--o{ activities : "history of"
 
@@ -79,6 +80,21 @@ erDiagram
         varchar delivery_channel "in_app now"
         int delivery_attempts
         varchar last_error_code
+        int schedule_version "bumped on reschedule or snooze"
+        timestamptz completed_at "user marked it done"
+    }
+    reminder_deliveries {
+        uuid id PK
+        uuid reminder_id FK
+        uuid user_id FK
+        int schedule_version "unique with reminder_id"
+        varchar idempotency_key "unique"
+        varchar channel
+        varchar status "pending | delivered | failed"
+        int attempts
+        timestamptz next_attempt_at
+        timestamptz delivered_at
+        varchar last_error_code
     }
     activities {
         uuid id PK
@@ -117,6 +133,8 @@ erDiagram
 | `ix_intentions_tags` (GIN) | Tag filter |
 | `ix_reminders_due` (partial: scheduled or snoozed) | The delivery worker's due scan |
 | `ix_reminders_user_scheduled` | A user's reminder list |
+| `uq_reminders_one_open_per_intention` (partial, unique: draft, scheduled or snoozed) | One open reminder per item |
+| `uq_reminder_deliveries_version` (`reminder_id`, `schedule_version`) | Each version of a reminder is delivered at most once (`docs/REMINDERS.md`) |
 | `ix_activities_user_created` | History and metrics |
 
 Text search (stage 09) starts with plain PostgreSQL queries. Full-text search or pgvector is added by a later migration only if the need is shown.

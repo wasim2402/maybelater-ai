@@ -1,3 +1,4 @@
+import asyncio
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 
@@ -10,8 +11,9 @@ from app.core.errors import register_error_handlers
 from app.core.logging import configure_logging, resolve_format
 from app.core.middleware import BodySizeLimitMiddleware, RequestContextMiddleware
 from app.core.startup import report_startup
-from app.db.session import engine
+from app.db.session import SessionLocal, engine
 from app.schemas.common import ERROR_RESPONSES
+from app.services.reminder_delivery import run_worker
 
 VERSION = "0.1.0"
 
@@ -26,7 +28,14 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         # The status panel (database, sign-in keys, AI, URLs). Skipped in tests, which build many apps.
         if settings.app_env != "test":
             await report_startup(settings, engine, VERSION, log_format)
+        # Reminder delivery runs on the server (never in a browser tab). Off in tests, which call it directly.
+        stop, worker = asyncio.Event(), None
+        if settings.reminder_worker_enabled and settings.app_env != "test":
+            worker = asyncio.create_task(run_worker(SessionLocal, stop, settings.reminder_worker_interval_seconds))
         yield
+        if worker is not None:
+            stop.set()
+            await worker
 
     app = FastAPI(
         title="MaybeLater API",

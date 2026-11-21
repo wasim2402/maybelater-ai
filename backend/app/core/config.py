@@ -47,6 +47,11 @@ class Settings(BaseSettings):
 
     redis_url: str = "redis://localhost:6379/0"
 
+    # Reminder delivery (docs/REMINDERS.md). The worker runs inside the API process by default; turn it
+    # off here and run `python -m app.worker` instead when the API runs as several processes.
+    reminder_worker_enabled: bool = True
+    reminder_worker_interval_seconds: float = Field(default=20.0, ge=1.0, le=300.0)
+
     @field_validator("cors_origins", mode="before")
     @classmethod
     def _split_origins(cls, value: object) -> object:

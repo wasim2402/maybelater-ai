@@ -9,7 +9,7 @@ from sqlalchemy import text
 from app.models import Base
 from tests.db_utils import downgrade, migrate, run, require_test_database_url
 
-EXPECTED_TABLES = {"activities", "alembic_version", "categories", "intention_analyses", "intentions", "reminders", "users"}
+EXPECTED_TABLES = {"activities", "alembic_version", "categories", "intention_analyses", "intentions", "reminder_deliveries", "reminders", "users"}
 
 
 @pytest.fixture(scope="module")

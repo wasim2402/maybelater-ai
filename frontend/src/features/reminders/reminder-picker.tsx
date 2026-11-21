@@ -1,88 +1,72 @@
 "use client";
 
-import { addDays, format, nextSaturday, set, startOfTomorrow } from "date-fns";
-import { BellRing, CalendarDays } from "lucide-react";
-import { useId, useMemo, useState, useSyncExternalStore } from "react";
+import { addDays, format, parseISO, set } from "date-fns";
+import { CalendarDays } from "lucide-react";
+import { useId, useMemo, useState } from "react";
 import { cn } from "cn";
 
 import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
 import { Input } from "@/components/ui/input";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { useNow } from "@/hooks/use-now";
+
+import type { ReminderWhen } from "./api";
+import { localString, wallClockNow } from "./wall-clock";
 
 interface ReminderPickerProps {
-  /** Current reminder, if one is set. */
-  value: Date | null;
-  /** Called only when the user presses "Set reminder": nothing is scheduled on selection alone. */
-  onConfirm: (when: Date) => void | Promise<void>;
-  onClear?: () => void | Promise<void>;
-  /** Shown so the user knows which clock the reminder follows. Defaults to the browser's zone. */
-  timeZone?: string;
-  now?: Date;
+  /** The user's time zone (Settings). Every time here is a time on that clock. */
+  timeZone: string;
+  /** Starting choice, as a wall-clock string ("2026-11-21T10:00"), when changing a reminder. */
+  initial?: string | null;
+  /** Called only when the user presses the confirm button: nothing is scheduled on selection alone. */
+  onConfirm: (when: ReminderWhen) => void | Promise<void>;
+  onCancel?: () => void;
+  confirmLabel?: string;
+  busy?: boolean;
   className?: string;
 }
 
 type Preset = { id: string; label: string; when: Date };
 
+/** Presets on the user's clock: this evening 19:00 (if still ahead), tomorrow 09:00, this weekend
+ *  (Saturday 10:00) and next week (Monday 09:00). */
 function buildPresets(now: Date): Preset[] {
   const at = (d: Date, hours: number) => set(d, { hours, minutes: 0, seconds: 0, milliseconds: 0 });
   const presets: Preset[] = [];
   const evening = at(now, 19);
   if (evening > now) presets.push({ id: "evening", label: "This evening", when: evening });
-  presets.push({ id: "tomorrow", label: "Tomorrow morning", when: at(startOfTomorrow(), 9) });
-  presets.push({ id: "weekend", label: "This weekend", when: at(nextSaturday(now), 10) });
-  presets.push({ id: "week", label: "In a week", when: at(addDays(now, 7), 9) });
+  presets.push({ id: "tomorrow", label: "Tomorrow morning", when: at(addDays(now, 1), 9) });
+  let saturday = at(addDays(now, (6 - now.getDay() + 7) % 7), 10);
+  if (saturday <= now) saturday = addDays(saturday, 7);
+  presets.push({ id: "weekend", label: "This weekend", when: saturday });
+  presets.push({ id: "week", label: "Next week", when: at(addDays(now, ((8 - now.getDay()) % 7) || 7), 9) });
   return presets;
 }
 
-const noop = () => () => {};
-/** True only in the browser: dates and time zones are read there, never during prerender. */
-function useIsClient() {
-  return useSyncExternalStore(noop, () => true, () => false);
-}
-
-/** Reminder control: quick presets or a chosen day and time, confirmed explicitly by the user. */
+/** Reminder control: quick choices or a day and time, then an explicit confirmation that states the
+ *  exact time and clock. Renders only in the browser (it needs the current time). */
 export function ReminderPicker(props: ReminderPickerProps) {
-  const isClient = useIsClient();
-  if (!isClient) {
-    return <div aria-hidden className={cn("h-72 animate-pulse rounded-lg bg-muted", props.className)} />;
-  }
-  return <ReminderPickerInner {...props} />;
+  const now = useNow();
+  if (!now) return <div aria-hidden className={cn("h-72 animate-pulse rounded-lg bg-muted", props.className)} />;
+  return <PickerInner {...props} nowMs={now} />;
 }
 
-function ReminderPickerInner({ value, onConfirm, onClear, timeZone: zoneProp, now: nowProp, className }: ReminderPickerProps) {
+function PickerInner({ timeZone, initial, onConfirm, onCancel, confirmLabel = "Set reminder", busy, className, nowMs }: ReminderPickerProps & { nowMs: number }) {
   const id = useId();
-  const [now] = useState(() => nowProp ?? new Date());
-  const [timeZone] = useState(() => zoneProp ?? Intl.DateTimeFormat().resolvedOptions().timeZone);
+  const now = useMemo(() => wallClockNow(nowMs, timeZone), [nowMs, timeZone]);
   const presets = useMemo(() => buildPresets(now), [now]);
-  const [selected, setSelected] = useState<Date | null>(value);
-  const [time, setTime] = useState(() => format(value ?? set(now, { hours: 9, minutes: 0 }), "HH:mm"));
-  const [busy, setBusy] = useState(false);
+  const [selected, setSelected] = useState<Date | null>(() => (initial ? parseISO(initial) : null));
+  const [time, setTime] = useState(() => (initial ? initial.slice(11, 16) : "09:00"));
 
-  const applyTime = (day: Date) => {
-    const [h, m] = time.split(":").map(Number);
+  const withTime = (day: Date, value = time) => {
+    const [h, m] = value.split(":").map(Number);
     return set(day, { hours: h || 0, minutes: m || 0, seconds: 0, milliseconds: 0 });
   };
-
   const inPast = selected ? selected <= now : false;
 
-  async function confirm() {
-    if (!selected || inPast) return;
-    setBusy(true);
-    try {
-      await onConfirm(selected);
-    } finally {
-      setBusy(false);
-    }
-  }
-
   return (
-    <section aria-labelledby={`${id}-title`} className={cn("space-y-3", className)}>
-      <h2 id={`${id}-title`} className="inline-flex items-center gap-2 text-base font-medium tracking-normal">
-        <BellRing aria-hidden className="size-4 text-sage-deep" />
-        Remind me
-      </h2>
-
+    <section aria-label="Choose when to be reminded" className={cn("space-y-3", className)}>
       <div role="radiogroup" aria-label="Quick choices" className="grid grid-cols-2 gap-2">
         {presets.map((p) => {
           const active = selected?.getTime() === p.when.getTime();
@@ -110,9 +94,7 @@ function ReminderPickerInner({ value, onConfirm, onClear, timeZone: zoneProp, no
 
       <div className="flex flex-col gap-2 sm:flex-row">
         <Popover>
-          <PopoverTrigger
-            render={<Button variant="outline" className="justify-start bg-card sm:flex-1" />}
-          >
+          <PopoverTrigger render={<Button variant="outline" className="justify-start bg-card sm:flex-1" />}>
             <CalendarDays aria-hidden />
             {selected ? format(selected, "EEEE d MMMM") : "Pick a day"}
           </PopoverTrigger>
@@ -120,8 +102,8 @@ function ReminderPickerInner({ value, onConfirm, onClear, timeZone: zoneProp, no
             <Calendar
               mode="single"
               selected={selected ?? undefined}
-              disabled={{ before: now }}
-              onSelect={(day) => day && setSelected(applyTime(day))}
+              disabled={{ before: set(now, { hours: 0, minutes: 0 }) }}
+              onSelect={(day) => day && setSelected(withTime(day))}
             />
           </PopoverContent>
         </Popover>
@@ -135,28 +117,38 @@ function ReminderPickerInner({ value, onConfirm, onClear, timeZone: zoneProp, no
             value={time}
             onChange={(e) => {
               setTime(e.target.value);
-              if (selected) {
-                const [h, m] = e.target.value.split(":").map(Number);
-                setSelected(set(selected, { hours: h || 0, minutes: m || 0 }));
-              }
+              if (selected) setSelected(withTime(selected, e.target.value));
             }}
             className="h-11"
           />
         </div>
       </div>
 
-      {inPast ? <p className="text-sm text-destructive">Pick a time later than now.</p> : null}
+      <p className="text-[15px]" aria-live="polite">
+        {!selected ? (
+          <span className="text-muted-foreground">Choose a day and time. Times are in {timeZone}.</span>
+        ) : inPast ? (
+          <span className="text-destructive">Pick a time later than now.</span>
+        ) : (
+          <>
+            You&apos;ll be reminded on <strong className="font-medium">{format(selected, "EEEE d MMMM 'at' HH:mm")}</strong>{" "}
+            <span className="text-muted-foreground">({timeZone})</span>. It appears under Reminders in the app.
+          </>
+        )}
+      </p>
 
       <div className="flex flex-wrap items-center gap-2">
-        <Button onClick={confirm} disabled={!selected || inPast || busy}>
-          {busy ? "Setting…" : "Set reminder"}
+        <Button
+          onClick={() => selected && !inPast && onConfirm({ local: localString(selected), timezone: timeZone })}
+          disabled={!selected || inPast || busy}
+        >
+          {busy ? "Saving…" : confirmLabel}
         </Button>
-        {value && onClear ? (
-          <Button variant="ghost" onClick={() => onClear()}>
-            Remove reminder
+        {onCancel ? (
+          <Button variant="ghost" onClick={onCancel} disabled={busy}>
+            Cancel
           </Button>
         ) : null}
-        {timeZone ? <span className="text-[13px] text-muted-foreground">Times in {timeZone}</span> : null}
       </div>
     </section>
   );

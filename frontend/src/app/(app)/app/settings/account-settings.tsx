@@ -46,6 +46,7 @@ export function AccountSettings() {
       ) : (
         <div className="mt-8 space-y-10">
           <ProfileForm me={me.data} />
+          <RemindersForm me={me.data} />
           <ResurfacingForm me={me.data} />
           <SessionSection />
           <DeleteAccountSection />
@@ -386,6 +387,107 @@ function ResurfacingForm({ me }: { me: Me }) {
         <div className="flex flex-wrap items-center gap-3">
           <Button type="submit" disabled={!dirty || update.isPending}>
             {update.isPending ? "Saving…" : "Save resurfacing settings"}
+          </Button>
+          <div aria-live="polite">
+            {saved && !dirty ? <SuccessNote>Saved.</SuccessNote> : null}
+            {update.isError ? (
+              <p role="alert" className="text-sm text-destructive">
+                {update.error.message}
+              </p>
+            ) : null}
+          </div>
+        </div>
+      </form>
+    </section>
+  );
+}
+
+/** Reminder delivery: on or off, and optional quiet hours (held until they end, on your clock). */
+function RemindersForm({ me }: { me: Me }) {
+  const id = useId();
+  const update = useUpdateMe();
+  const current = me.preferences.reminders;
+  const [enabled, setEnabled] = useState(current.enabled);
+  const [quiet, setQuiet] = useState(current.quiet_hours !== null);
+  const [start, setStart] = useState(current.quiet_hours?.start ?? "22:00");
+  const [end, setEnd] = useState(current.quiet_hours?.end ?? "07:00");
+  const [saved, setSaved] = useState(false);
+  const dirty =
+    enabled !== current.enabled ||
+    quiet !== (current.quiet_hours !== null) ||
+    (quiet && (start !== current.quiet_hours?.start || end !== current.quiet_hours?.end));
+  const touch = () => setSaved(false);
+
+  return (
+    <section aria-labelledby={`${id}-h`} className="space-y-4 border-t border-line pt-8">
+      <div>
+        <h2 id={`${id}-h`} className="text-xl">
+          Reminders
+        </h2>
+        <p className="mt-1 text-[15px] text-ink/85">
+          Reminders appear in the app at the time you set, on {me.timezone} time. Nothing is emailed or pushed to your phone yet.
+        </p>
+      </div>
+      <form
+        className="space-y-4"
+        onSubmit={(e) => {
+          e.preventDefault();
+          update.mutate(
+            { preferences: { ...me.preferences, reminders: { enabled, quiet_hours: quiet ? { start, end } : null } } },
+            { onSuccess: () => setSaved(true) },
+          );
+        }}
+      >
+        <label className="flex items-start gap-3">
+          <input
+            type="checkbox"
+            checked={enabled}
+            onChange={(e) => {
+              setEnabled(e.target.checked);
+              touch();
+            }}
+            className="mt-1 size-4 accent-[var(--brand-sage-deep)]"
+          />
+          <span>
+            <span className="block text-[15px] font-medium">Show my reminders</span>
+            <span className="block text-[13px] text-muted-foreground">Turned off, reminders you set stay saved but none are shown until you turn this back on.</span>
+          </span>
+        </label>
+        <label className="flex items-start gap-3">
+          <input
+            type="checkbox"
+            checked={quiet}
+            disabled={!enabled}
+            onChange={(e) => {
+              setQuiet(e.target.checked);
+              touch();
+            }}
+            className="mt-1 size-4 accent-[var(--brand-sage-deep)]"
+          />
+          <span>
+            <span className="block text-[15px] font-medium">Quiet hours</span>
+            <span className="block text-[13px] text-muted-foreground">A reminder due in quiet hours waits until they end.</span>
+          </span>
+        </label>
+        {quiet && enabled ? (
+          <div className="grid max-w-sm grid-cols-2 gap-4 pl-7">
+            <div className="space-y-1.5">
+              <label htmlFor={`${id}-start`} className="text-sm font-medium">
+                From
+              </label>
+              <Input id={`${id}-start`} type="time" value={start} onChange={(e) => { setStart(e.target.value); touch(); }} className="h-11" />
+            </div>
+            <div className="space-y-1.5">
+              <label htmlFor={`${id}-end`} className="text-sm font-medium">
+                Until
+              </label>
+              <Input id={`${id}-end`} type="time" value={end} onChange={(e) => { setEnd(e.target.value); touch(); }} className="h-11" />
+            </div>
+          </div>
+        ) : null}
+        <div className="flex flex-wrap items-center gap-3">
+          <Button type="submit" disabled={!dirty || update.isPending || (quiet && (!start || !end))}>
+            {update.isPending ? "Saving…" : "Save reminder settings"}
           </Button>
           <div aria-live="polite">
             {saved && !dirty ? <SuccessNote>Saved.</SuccessNote> : null}

@@ -176,7 +176,9 @@ Template: `.env.example` at the repository root. Copy browser-safe values into `
 | `AUTH_BASE_URL`, `AUTH_JWKS_URL`, `AUTH_AUDIENCE` | API | Token verification with Better Auth's public keys (`docs/AUTH.md`) |
 | `CORS_ORIGINS` | API | JSON list or comma-separated |
 | `MAX_REQUEST_BYTES` | API | Request body cap |
-| `REDIS_URL` | API | Only when background jobs are added |
+| `REDIS_URL` | API | Not used yet. Reminders are scheduled through PostgreSQL (`docs/REMINDERS.md`). |
+| `REMINDER_WORKER_ENABLED` | API | Run reminder delivery inside the API process (default `true`). Otherwise run `python -m app.worker`. |
+| `REMINDER_WORKER_INTERVAL_SECONDS` | API | Time between reminder delivery passes (default 20) |
 
 ## 8. Running each app on its own
 

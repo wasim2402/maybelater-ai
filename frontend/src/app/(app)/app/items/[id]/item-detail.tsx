@@ -38,6 +38,7 @@ import { CategoryLabel, StatusLabel } from "@/features/intentions/labels";
 import { suggestedFields } from "@/features/intentions/suggestions";
 import type { Intention, IntentionUpdate, SuggestionKey } from "@/features/intentions/types";
 import { markViewed, recommendationsKey } from "@/features/resurfacing/api";
+import { ItemReminder } from "@/features/reminders/item-reminder";
 import { BringBack } from "@/features/resurfacing/bring-back";
 import { ApiError } from "@/lib/api/errors";
 
@@ -156,6 +157,8 @@ function Loaded({ item }: { item: Intention }) {
           <p className="rounded-lg border border-line bg-card p-4 text-[15px] whitespace-pre-wrap break-words">{item.original_content}</p>
         )}
       </section>
+
+      <ItemReminder itemId={item.id} />
 
       <BringBack item={item} />
 

@@ -1,6 +1,6 @@
 "use client";
 
-import { BellRing, CalendarCheck, CheckCircle2, Clock3, History, Link2, NotebookPen, Sparkles, X, type LucideIcon } from "lucide-react";
+import { CalendarCheck, CheckCircle2, Clock3, History, Link2, NotebookPen, Repeat2, Sparkles, X, type LucideIcon } from "lucide-react";
 import Link from "next/link";
 import { toast } from "sonner";
 
@@ -44,7 +44,7 @@ export function ResurfacedList() {
             {recs.error.message}
           </ErrorState>
         ) : recs.data.items.length === 0 ? (
-          <EmptyState icon={BellRing} title="Nothing to look at again right now">
+          <EmptyState icon={Repeat2} title="Nothing to look at again right now">
             Open an item and choose <strong className="font-medium">Bring it back</strong> to pick a day, or snooze something
             from here. It will show up on this page when the time comes.
           </EmptyState>

@@ -6,6 +6,7 @@
     ●  Sign-in      keys reachable · http://localhost:3000/api/auth/jwks
     ○  AI           not configured · set GEMINI_API_KEY
     ●  CORS         http://localhost:3000
+    ●  Reminders    in-app delivery · checks every 20 s
        API          http://127.0.0.1:8000/api/v1
        Docs         http://127.0.0.1:8000/docs
 
@@ -73,6 +74,12 @@ def ai_check(settings: Settings) -> Check:
     return Check("AI", "off", "not configured · set GEMINI_API_KEY")
 
 
+def reminders_check(settings: Settings) -> Check:
+    if settings.reminder_worker_enabled:
+        return Check("Reminders", "ok", f"in-app delivery · checks every {settings.reminder_worker_interval_seconds:g} s")
+    return Check("Reminders", "off", "worker off here · run `python -m app.worker`")
+
+
 def public_base(settings: Settings) -> str:
     """The address the server listens on, from uvicorn's --host/--port when given."""
     host, port = settings.api_host, str(settings.api_port)
@@ -89,7 +96,7 @@ def public_base(settings: Settings) -> str:
 async def run_checks(settings: Settings, engine: AsyncEngine) -> list[Check]:
     database, auth = await asyncio.gather(check_database(engine), check_auth_keys(settings))
     base = public_base(settings)
-    checks = [database, auth, ai_check(settings), Check("CORS", "ok", ", ".join(settings.cors_origins)), Check("API", "info", f"{base}/api/v1")]
+    checks = [database, auth, ai_check(settings), Check("CORS", "ok", ", ".join(settings.cors_origins)), reminders_check(settings), Check("API", "info", f"{base}/api/v1")]
     if settings.is_development:
         checks.append(Check("Docs", "info", f"{base}/docs"))
     return checks
