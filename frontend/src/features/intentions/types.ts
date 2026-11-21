@@ -98,3 +98,19 @@ export type IntentionUpdate = Partial<{
   resurface_condition: string;
   status: IntentionStatus;
 }>;
+
+export const recommendationSchema = z.object({
+  item: intentionSchema,
+  signal: z.enum(["date", "snooze", "condition", "stale"]),
+  reason: z.string(),
+  next_action: z.enum(["open", "snooze", "complete"]),
+  due_at: z.string(),
+});
+
+export const recommendationListSchema = z.object({
+  items: z.array(recommendationSchema),
+  generated_at: z.string(),
+});
+
+export type Recommendation = z.infer<typeof recommendationSchema>;
+export type WhenPreset = "tomorrow" | "weekend" | "next_week" | "in_a_month";

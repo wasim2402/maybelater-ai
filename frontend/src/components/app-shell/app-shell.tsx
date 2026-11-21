@@ -1,6 +1,6 @@
 "use client";
 
-import { Inbox, Plus, Settings, type LucideIcon } from "lucide-react";
+import { BellRing, Inbox, Plus, Settings, type LucideIcon } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState } from "react";
@@ -18,9 +18,10 @@ export interface NavItem {
   count?: number;
 }
 
-/** Areas that exist today. Resurfaced and Completed join when stages 10 and 12 build them. */
+/** Main areas. Done items live under the inbox's "Done" filter. */
 export const APP_NAV: NavItem[] = [
   { href: "/app", label: "Inbox", icon: Inbox },
+  { href: "/app/resurfaced", label: "Resurfaced", icon: BellRing },
   { href: "/app/settings", label: "Settings", icon: Settings },
 ];
 

@@ -46,6 +46,7 @@ export function AccountSettings() {
       ) : (
         <div className="mt-8 space-y-10">
           <ProfileForm me={me.data} />
+          <ResurfacingForm me={me.data} />
           <SessionSection />
           <DeleteAccountSection />
         </div>
@@ -264,6 +265,138 @@ function DeleteAccountSection() {
           </form>
         </DialogContent>
       </Dialog>
+    </section>
+  );
+}
+
+const FREQUENCIES = [
+  { value: "daily", label: "Up to once a day" },
+  { value: "few_times_week", label: "A few times a week" },
+  { value: "weekly", label: "Once a week" },
+] as const;
+
+const STALE_OPTIONS = [
+  { value: "", label: "Off" },
+  { value: "14", label: "After 2 weeks" },
+  { value: "30", label: "After a month" },
+  { value: "90", label: "After 3 months" },
+];
+
+/** Resurfacing preferences. Dates you choose and snoozes always apply; these control the gentle
+ *  suggestions on top (conditions like "this weekend", and items you haven't looked at). */
+function ResurfacingForm({ me }: { me: Me }) {
+  const id = useId();
+  const update = useUpdateMe();
+  const current = me.preferences.resurfacing;
+  const [enabled, setEnabled] = useState(current.enabled);
+  const [frequency, setFrequency] = useState<string>(current.frequency);
+  const [stale, setStale] = useState(current.stale_after_days ? String(current.stale_after_days) : "");
+  const [saved, setSaved] = useState(false);
+  const dirty =
+    enabled !== current.enabled || frequency !== current.frequency || stale !== (current.stale_after_days ? String(current.stale_after_days) : "");
+
+  return (
+    <section aria-labelledby={`${id}-h`} className="space-y-4 border-t border-line pt-8">
+      <div>
+        <h2 id={`${id}-h`} className="text-xl">
+          Resurfacing
+        </h2>
+        <p className="mt-1 text-[15px] text-ink/85">
+          Days you choose and snoozes always bring items back. These settings control the extra suggestions.
+        </p>
+      </div>
+      <form
+        className="space-y-4"
+        onSubmit={(e) => {
+          e.preventDefault();
+          update.mutate(
+            {
+              preferences: {
+                ...me.preferences,
+                resurfacing: {
+                  enabled,
+                  frequency: frequency as Me["preferences"]["resurfacing"]["frequency"],
+                  stale_after_days: stale ? Number(stale) : null,
+                },
+              },
+            },
+            { onSuccess: () => setSaved(true) },
+          );
+        }}
+      >
+        <label className="flex items-start gap-3">
+          <input
+            type="checkbox"
+            checked={enabled}
+            onChange={(e) => {
+              setEnabled(e.target.checked);
+              setSaved(false);
+            }}
+            className="mt-1 size-4 accent-[var(--brand-sage-deep)]"
+          />
+          <span>
+            <span className="block text-[15px] font-medium">Suggest items to look at again</span>
+            <span className="block text-[13px] text-muted-foreground">For example when it&apos;s the weekend and you saved something for &ldquo;this weekend&rdquo;.</span>
+          </span>
+        </label>
+        <div className="grid gap-4 sm:grid-cols-2">
+          <div className="space-y-1.5">
+            <label htmlFor={`${id}-freq`} className="text-sm font-medium">
+              How often the same item can come back
+            </label>
+            <select
+              id={`${id}-freq`}
+              value={frequency}
+              disabled={!enabled}
+              onChange={(e) => {
+                setFrequency(e.target.value);
+                setSaved(false);
+              }}
+              className="h-12 w-full rounded-md border border-input bg-card px-3 text-base focus-visible:outline-2 focus-visible:outline-ring disabled:opacity-60"
+            >
+              {FREQUENCIES.map((f) => (
+                <option key={f.value} value={f.value}>
+                  {f.label}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div className="space-y-1.5">
+            <label htmlFor={`${id}-stale`} className="text-sm font-medium">
+              Bring back items I haven&apos;t looked at
+            </label>
+            <select
+              id={`${id}-stale`}
+              value={stale}
+              disabled={!enabled}
+              onChange={(e) => {
+                setStale(e.target.value);
+                setSaved(false);
+              }}
+              className="h-12 w-full rounded-md border border-input bg-card px-3 text-base focus-visible:outline-2 focus-visible:outline-ring disabled:opacity-60"
+            >
+              {STALE_OPTIONS.map((o) => (
+                <option key={o.value} value={o.value}>
+                  {o.label}
+                </option>
+              ))}
+            </select>
+          </div>
+        </div>
+        <div className="flex flex-wrap items-center gap-3">
+          <Button type="submit" disabled={!dirty || update.isPending}>
+            {update.isPending ? "Saving…" : "Save resurfacing settings"}
+          </Button>
+          <div aria-live="polite">
+            {saved && !dirty ? <SuccessNote>Saved.</SuccessNote> : null}
+            {update.isError ? (
+              <p role="alert" className="text-sm text-destructive">
+                {update.error.message}
+              </p>
+            ) : null}
+          </div>
+        </div>
+      </form>
     </section>
   );
 }

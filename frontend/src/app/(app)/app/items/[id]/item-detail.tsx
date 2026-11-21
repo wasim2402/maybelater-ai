@@ -1,10 +1,11 @@
 "use client";
 
+import { useQueryClient } from "@tanstack/react-query";
 import { format } from "date-fns";
 import { Archive, ArchiveRestore, ArrowLeft, CheckCircle2, ExternalLink, RotateCcw, Sparkles, Trash2 } from "lucide-react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
-import { useId, useState } from "react";
+import { useEffect, useId, useState } from "react";
 import { toast } from "sonner";
 
 import { ConfirmDialog } from "@/components/feedback/confirm-dialog";
@@ -36,6 +37,8 @@ import { displayTitle } from "@/features/intentions/intention-row";
 import { CategoryLabel, StatusLabel } from "@/features/intentions/labels";
 import { suggestedFields } from "@/features/intentions/suggestions";
 import type { Intention, IntentionUpdate, SuggestionKey } from "@/features/intentions/types";
+import { markViewed, recommendationsKey } from "@/features/resurfacing/api";
+import { BringBack } from "@/features/resurfacing/bring-back";
 import { ApiError } from "@/lib/api/errors";
 
 export function ItemDetail() {
@@ -81,6 +84,12 @@ function Loaded({ item }: { item: Intention }) {
   // Which saved version the details form confirmed. Lives here because the form re-mounts
   // when the item changes on the server (including after its own save).
   const [savedVersion, setSavedVersion] = useState<string | null>(null);
+
+  // Opening an item counts as looking at it again: it leaves Resurfaced if it had come due.
+  const queryClient = useQueryClient();
+  useEffect(() => {
+    void markViewed(item.id).then(() => queryClient.invalidateQueries({ queryKey: recommendationsKey }));
+  }, [item.id, queryClient]);
   const router = useRouter();
   const update = useUpdateIntention();
   const remove = useDeleteIntention();
@@ -147,6 +156,8 @@ function Loaded({ item }: { item: Intention }) {
           <p className="rounded-lg border border-line bg-card p-4 text-[15px] whitespace-pre-wrap break-words">{item.original_content}</p>
         )}
       </section>
+
+      <BringBack item={item} />
 
       <Suggestions item={item} />
 

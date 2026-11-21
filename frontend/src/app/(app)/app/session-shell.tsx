@@ -4,9 +4,10 @@ import { useRouter } from "next/navigation";
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 
-import { AppShell } from "@/components/app-shell/app-shell";
+import { APP_NAV, AppShell } from "@/components/app-shell/app-shell";
 import type { CaptureInput } from "@/features/capture/capture-schema";
 import { useCapture } from "@/features/intentions/api";
+import { useRecommendations } from "@/features/resurfacing/api";
 import { setUnauthenticatedHandler } from "@/lib/api/client";
 import type { SessionUser } from "@/lib/auth/server";
 
@@ -22,6 +23,12 @@ export function SessionShell({ user, children }: { user: SessionUser; children: 
   const router = useRouter();
   const capture = useCapture();
   const [captureOpen, setCaptureOpen] = useState(false);
+  const recommendations = useRecommendations();
+  const resurfacedCount = recommendations.data?.items.length ?? 0;
+  const nav = useMemo(
+    () => APP_NAV.map((n) => (n.href === "/app/resurfaced" ? { ...n, count: resurfacedCount || undefined } : n)),
+    [resurfacedCount],
+  );
 
   useEffect(() => {
     setUnauthenticatedHandler(() => {
@@ -48,6 +55,7 @@ export function SessionShell({ user, children }: { user: SessionUser; children: 
     <CaptureContext.Provider value={context}>
       <AppShell
         account={{ name: user.name, email: user.email }}
+        nav={nav}
         onCapture={onCapture}
         captureOpen={captureOpen}
         onCaptureOpenChange={setCaptureOpen}

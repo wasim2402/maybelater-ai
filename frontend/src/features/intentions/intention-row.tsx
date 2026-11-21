@@ -1,7 +1,7 @@
 "use client";
 
-import { formatDistanceToNowStrict } from "date-fns";
-import { Archive, ArchiveRestore, CheckCircle2, Link2, MoreHorizontal, NotebookPen, RotateCcw, Trash2 } from "lucide-react";
+import { format, formatDistanceToNowStrict } from "date-fns";
+import { Archive, ArchiveRestore, CalendarClock, CheckCircle2, Clock3, Link2, MoreHorizontal, NotebookPen, RotateCcw, Trash2 } from "lucide-react";
 import Link from "next/link";
 import { cn } from "cn";
 
@@ -14,6 +14,8 @@ import {
 } from "@/components/ui/dropdown-menu";
 
 import { AnalysisLabel, CategoryLabel, StatusLabel } from "./labels";
+import { useNow } from "@/hooks/use-now";
+
 import type { Intention } from "./types";
 
 export type IntentionAction = "complete" | "reopen" | "archive" | "restore" | "delete";
@@ -74,6 +76,7 @@ export function IntentionRow({ item, href, onAction, className }: IntentionRowPr
           {item.status !== "inbox" ? <StatusLabel status={item.status} /> : null}
           <AnalysisLabel state={item.analysis_status} />
           {item.category ? <CategoryLabel>{item.category.name}</CategoryLabel> : null}
+          <ComingBack item={item} />
           <span className="text-[13px] text-muted-foreground">
             {host ? `${host} · ` : ""}saved <time dateTime={item.created_at}>{saved}</time>
           </span>
@@ -117,5 +120,21 @@ export function IntentionRow({ item, href, onAction, className }: IntentionRowPr
         <span />
       )}
     </li>
+  );
+}
+
+/** "Back Sat 21 Nov" or "Snoozed until …": when an item is set to come back to Resurfaced. */
+function ComingBack({ item }: { item: Intention }) {
+  const now = useNow();
+  if (!now) return null;
+  const snoozed = item.snoozed_until && new Date(item.snoozed_until).getTime() > now ? new Date(item.snoozed_until) : null;
+  const back = item.resurface_at && new Date(item.resurface_at).getTime() > now ? new Date(item.resurface_at) : null;
+  if (!snoozed && !back) return null;
+  const Icon = snoozed ? Clock3 : CalendarClock;
+  return (
+    <span className="inline-flex h-6 items-center gap-1 text-[13px] text-muted-foreground">
+      <Icon aria-hidden className="size-3.5" />
+      {snoozed ? `Snoozed until ${format(snoozed, "EEE d MMM")}` : `Back ${format(back!, "EEE d MMM")}`}
+    </span>
   );
 }
