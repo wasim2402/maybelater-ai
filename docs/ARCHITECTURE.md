@@ -179,6 +179,7 @@ Template: `.env.example` at the repository root. Copy browser-safe values into `
 | `REDIS_URL` | API | Not used yet. Reminders are scheduled through PostgreSQL (`docs/REMINDERS.md`). |
 | `REMINDER_WORKER_ENABLED` | API | Run reminder delivery inside the API process (default `true`). Otherwise run `python -m app.worker`. |
 | `REMINDER_WORKER_INTERVAL_SECONDS` | API | Time between reminder delivery passes (default 20) |
+| `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY` (secret), `VAPID_SUBJECT` | API | Web Push for reminder notifications (`docs/NOTIFICATIONS.md`). Generate with `scripts/generate_vapid_keys.py`. |
 
 ## 8. Running each app on its own
 

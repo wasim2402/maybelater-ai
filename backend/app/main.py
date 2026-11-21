@@ -13,6 +13,7 @@ from app.core.middleware import BodySizeLimitMiddleware, RequestContextMiddlewar
 from app.core.startup import report_startup
 from app.db.session import SessionLocal, engine
 from app.schemas.common import ERROR_RESPONSES
+from app.services.push import WebPushSender
 from app.services.reminder_delivery import run_worker
 
 VERSION = "0.1.0"
@@ -31,7 +32,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         # Reminder delivery runs on the server (never in a browser tab). Off in tests, which call it directly.
         stop, worker = asyncio.Event(), None
         if settings.reminder_worker_enabled and settings.app_env != "test":
-            worker = asyncio.create_task(run_worker(SessionLocal, stop, settings.reminder_worker_interval_seconds))
+            sender = WebPushSender(settings) if settings.push_configured else None
+            worker = asyncio.create_task(run_worker(SessionLocal, stop, settings.reminder_worker_interval_seconds, push_sender=sender))
         yield
         if worker is not None:
             stop.set()

@@ -10,6 +10,7 @@ export const preferencesSchema = z.object({
   reminders: z.object({
     enabled: z.boolean(),
     quiet_hours: z.object({ start: z.string(), end: z.string() }).nullable(),
+    sound: z.boolean(),
   }),
   resurfacing: z.object({
     enabled: z.boolean(),

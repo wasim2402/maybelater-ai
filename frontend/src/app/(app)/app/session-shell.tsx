@@ -8,6 +8,7 @@ import { APP_NAV, AppShell } from "@/components/app-shell/app-shell";
 import type { CaptureInput } from "@/features/capture/capture-schema";
 import { useMe } from "@/features/account/api";
 import { useCapture } from "@/features/intentions/api";
+import { useNotificationBridge } from "@/features/notifications/use-notification-bridge";
 import { useReminderAlerts } from "@/features/reminders/use-reminder-alerts";
 import { useRecommendations } from "@/features/resurfacing/api";
 import { setUnauthenticatedHandler } from "@/lib/api/client";
@@ -28,7 +29,9 @@ export function SessionShell({ user, children }: { user: SessionUser; children: 
   const [captureOpen, setCaptureOpen] = useState(false);
   const recommendations = useRecommendations();
   const resurfacedCount = recommendations.data?.items.length ?? 0;
-  const dueCount = useReminderAlerts();
+  const me = useMe();
+  const dueCount = useReminderAlerts(me.data?.preferences.reminders.sound ?? true);
+  useNotificationBridge();
   const nav = useMemo(
     () =>
       APP_NAV.map((n) =>
@@ -42,7 +45,7 @@ export function SessionShell({ user, children }: { user: SessionUser; children: 
   );
 
   // "Reduce motion" from Settings applies across the app (on top of the system setting).
-  const reduceMotion = useMe().data?.preferences.reduce_motion ?? false;
+  const reduceMotion = me.data?.preferences.reduce_motion ?? false;
   useEffect(() => {
     applyMotionPreference(reduceMotion);
     return () => applyMotionPreference(false);

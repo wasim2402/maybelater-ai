@@ -76,7 +76,8 @@ def ai_check(settings: Settings) -> Check:
 
 def reminders_check(settings: Settings) -> Check:
     if settings.reminder_worker_enabled:
-        return Check("Reminders", "ok", f"in-app delivery · checks every {settings.reminder_worker_interval_seconds:g} s")
+        push = "in-app + push notifications" if settings.push_configured else "in-app only · push off: run scripts/generate_vapid_keys.py"
+        return Check("Reminders", "ok", f"{push} · checks every {settings.reminder_worker_interval_seconds:g} s")
     return Check("Reminders", "off", "worker off here · run `python -m app.worker`")
 
 

@@ -11,3 +11,4 @@ tenacity
 python-multipart
 PyJWT[crypto]
 tzdata
+pywebpush

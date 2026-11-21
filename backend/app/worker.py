@@ -14,6 +14,7 @@ import signal
 from app.core.config import get_settings
 from app.core.logging import configure_logging, resolve_format
 from app.db.session import SessionLocal
+from app.services.push import WebPushSender
 from app.services.reminder_delivery import run_worker
 
 
@@ -25,7 +26,8 @@ async def main() -> None:
     for sig in (signal.SIGINT, signal.SIGTERM):
         with contextlib.suppress(NotImplementedError):  # Windows: Ctrl+C raises KeyboardInterrupt instead
             loop.add_signal_handler(sig, stop.set)
-    await run_worker(SessionLocal, stop, settings.reminder_worker_interval_seconds)
+    sender = WebPushSender(settings) if settings.push_configured else None
+    await run_worker(SessionLocal, stop, settings.reminder_worker_interval_seconds, push_sender=sender)
 
 
 if __name__ == "__main__":

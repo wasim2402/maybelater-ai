@@ -426,3 +426,47 @@ Update this file after each numbered implementation stage. Stage documents live 
 - **Known issues:**
   1. Running many e2e specs back to back reaches the sign-up limit (5 per 10 minutes, Better Auth) and the API's `DELETE /me` limit. Run specs in small groups with `--workers=1`, or clear the dev `auth."rateLimit"` rows and restart the API between runs. The limits themselves are intended.
 - **Next stage:** 13 — `13_TESTING_AND_QUALITY.md` (not started).
+
+### 2026-11-21 — Reminder notifications with sound (between stages 12 and 13)
+- **Request:** reminders should arrive as notifications with sound. The user chose **"Even when closed"** (Web Push) and the **soft chime**.
+- **Summary:**
+  - **Web Push channel on top of reminder delivery:**
+    - VAPID keys (`scripts/generate_vapid_keys.py` writes them to `backend/.env`; only the public key is printed).
+    - A `push_subscriptions` table (migration `692e5a2392c6`).
+    - `reminder_deliveries` is now unique per (reminder, version, channel).
+    - A delivered reminder queues one push in the same transaction; the worker sends it with pywebpush.
+    - Delivery is once only (SKIP LOCKED, plus `Topic` and `tag` dedup); retries back off; a gone subscription is disabled; stale pushes are dropped.
+    - Only known push-service endpoints are accepted.
+  - **Consent:**
+    - Opt in per device through Settings and the browser prompt.
+    - Turn off per device, or remove any device.
+    - Signing out unsubscribes the browser; account deletion cascades.
+    - Pause and quiet hours apply.
+  - **Browser:**
+    - `public/sw.js` shows the system notification when no tab is focused, otherwise hands off to the app; clicking opens the item.
+    - In-app chime (Web Audio, two soft notes, switchable).
+    - A Settings section for every device state.
+    - `app/manifest.ts` and an icon (iPhone and iPad need Home Screen install).
+- **Files changed:**
+  - Backend:
+    - `app/services/{push,reminder_delivery}.py`, `app/api/routes/notifications.py`, `app/api/router.py`
+    - `app/models/{reminder,__init__}.py`, `app/schemas/user.py` (`reminders.sound`)
+    - `app/core/{config,startup}.py`, `app/main.py`, `app/worker.py`
+    - `scripts/generate_vapid_keys.py`, `requirements.txt`, `requirements.lock.txt` (pywebpush 2.5.0)
+    - Migration `692e5a2392c6`
+    - `tests/test_push.py`, `tests/test_migrations.py`
+  - Frontend:
+    - `public/sw.js`, `public/notification-icon.png`, `src/app/manifest.ts`
+    - `src/features/notifications/*`
+    - `src/features/reminders/use-reminder-alerts.ts`, `src/features/account/api.ts`
+    - `session-shell.tsx`, `settings/account-settings.tsx`, `next.config.ts` (sw.js headers)
+    - `e2e/notifications.spec.ts`
+  - Docs: `docs/NOTIFICATIONS.md`, plus `REMINDERS.md`, `ARCHITECTURE.md` and `DATA_MODEL.md`
+- **Validation:**
+  - Backend `pytest`: 341 passed (30 new). Migration applied; `alembic check` reports no drift.
+  - Frontend: lint and typecheck pass; `vitest` 57 passed (5 new); `next build` passes.
+  - Real-service check: Chrome subscribed via FCM through `sw.js`; the app's sender got **201**; the service worker received and decrypted the push.
+- **Known issues:**
+  1. `e2e/notifications.spec.ts` has not been run. The user's debug API on port 8000 predates this change (`/notifications/push` returned 404). Restart it so it loads the new code and the VAPID keys, then run `PLAYWRIGHT_CHANNEL=chrome npx playwright test e2e/notifications.spec.ts --project=desktop`.
+  2. Automation can't read back notifications Windows displays (`getNotifications()` is empty even for a direct `showNotification`), so whether the notification actually appears is a manual check: use **Send a test notification**.
+  3. Notification action buttons (Done or Snooze from the notification) aren't offered: the service worker has no sign-in token by design. Clicking opens the item.

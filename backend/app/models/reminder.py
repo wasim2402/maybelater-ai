@@ -79,9 +79,9 @@ class Reminder(UUIDPrimaryKey, Timestamps, Base):
 
 
 class ReminderDelivery(UUIDPrimaryKey, Timestamps, Base):
-    """One delivery of one version of a reminder: the idempotency record and its attempts.
+    """One delivery of one version of a reminder on one channel: the idempotency record and its attempts.
 
-    The unique (reminder_id, schedule_version) is what makes delivery exactly-once per version: a
+    The unique (reminder_id, schedule_version, channel) is what makes delivery once-only per version: a
     second worker, a retry or a crash-and-rerun finds this row instead of sending again. External
     channels (later) pass `idempotency_key` to their provider. Only codes are stored, never content.
     """
@@ -92,7 +92,7 @@ class ReminderDelivery(UUIDPrimaryKey, Timestamps, Base):
         check_in("channel", values(DeliveryChannel), "channel_valid"),
         CheckConstraint("attempts >= 0", name="attempts_non_negative"),
         CheckConstraint("status <> 'delivered' OR delivered_at IS NOT NULL", name="delivered_has_timestamp"),
-        UniqueConstraint("reminder_id", "schedule_version", name="uq_reminder_deliveries_version"),
+        UniqueConstraint("reminder_id", "schedule_version", "channel", name="uq_reminder_deliveries_version_channel"),
         UniqueConstraint("idempotency_key", name="uq_reminder_deliveries_idempotency_key"),
         Index("ix_reminder_deliveries_user_id", "user_id"),
     )
@@ -108,3 +108,26 @@ class ReminderDelivery(UUIDPrimaryKey, Timestamps, Base):
     next_attempt_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     delivered_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     last_error_code: Mapped[str | None] = mapped_column(String(60))
+
+
+class PushSubscription(UUIDPrimaryKey, Timestamps, Base):
+    """A browser's Web Push subscription: this device agreed to receive notifications (the browser's
+    permission prompt is the consent; turning it off in Settings is the unsubscribe). One endpoint
+    belongs to one user; signing in as someone else on the same browser moves it. Disabled when the
+    push service says the subscription is gone (404/410)."""
+
+    __tablename__ = "push_subscriptions"
+    __table_args__ = (
+        UniqueConstraint("endpoint", name="uq_push_subscriptions_endpoint"),
+        Index("ix_push_subscriptions_user_id", "user_id"),
+        CheckConstraint("failure_count >= 0", name="failure_count_non_negative"),
+    )
+
+    user_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    endpoint: Mapped[str] = mapped_column(String(1024), nullable=False)
+    p256dh: Mapped[str] = mapped_column(String(255), nullable=False)
+    auth: Mapped[str] = mapped_column(String(64), nullable=False)
+    label: Mapped[str | None] = mapped_column(String(120))  # e.g. "Chrome on Windows", for the device list
+    last_success_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    failure_count: Mapped[int] = mapped_column(Integer, nullable=False, server_default="0", default=0)
+    disabled_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))

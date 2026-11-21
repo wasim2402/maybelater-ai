@@ -20,6 +20,9 @@ class ReminderPreferences(BaseModel):
 
     enabled: bool = True
     quiet_hours: QuietHours | None = None
+    # Play a soft chime in the open app when a reminder comes due (the OS plays its own sound for
+    # system notifications).
+    sound: bool = True
 
 
 class ResurfacingPreferences(BaseModel):

@@ -18,6 +18,8 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { useMe, useUpdateMe, type Me } from "@/features/account/api";
+import { disablePushOnThisDevice } from "@/features/notifications/api";
+import { NotificationsSection } from "@/features/notifications/notifications-section";
 import { clearApiToken } from "@/lib/api/token";
 import { authClient } from "@/lib/auth/client";
 
@@ -47,6 +49,7 @@ export function AccountSettings() {
         <div className="mt-8 space-y-10">
           <ProfileForm me={me.data} />
           <RemindersForm me={me.data} />
+          <NotificationsSection me={me.data} />
           <ResurfacingForm me={me.data} />
           <AccessibilityForm me={me.data} />
           <SessionSection />
@@ -158,6 +161,8 @@ function SessionSection() {
         disabled={busy}
         onClick={async () => {
           setBusy(true);
+          // A signed-out browser shouldn't keep showing this account's reminders.
+          await disablePushOnThisDevice().catch(() => undefined);
           await authClient.signOut();
           clearApiToken();
           router.replace("/login?reason=signed-out");
@@ -426,7 +431,7 @@ function RemindersForm({ me }: { me: Me }) {
           Reminders
         </h2>
         <p className="mt-1 text-[15px] text-ink/85">
-          Reminders appear in the app at the time you set, on {me.timezone} time. Nothing is emailed or pushed to your phone yet.
+          Reminders appear in the app at the time you set, on {me.timezone} time. Turn on notifications below to get them with the app closed.
         </p>
       </div>
       <form
@@ -434,7 +439,7 @@ function RemindersForm({ me }: { me: Me }) {
         onSubmit={(e) => {
           e.preventDefault();
           update.mutate(
-            { preferences: { ...me.preferences, reminders: { enabled, quiet_hours: quiet ? { start, end } : null } } },
+            { preferences: { ...me.preferences, reminders: { ...me.preferences.reminders, enabled, quiet_hours: quiet ? { start, end } : null } } },
             { onSuccess: () => setSaved(true) },
           );
         }}

@@ -5,13 +5,14 @@ import { useEffect, useRef } from "react";
 import { toast } from "sonner";
 
 import { displayTitle } from "@/features/intentions/intention-row";
+import { playChime } from "@/features/notifications/chime";
 
 import { useReminders } from "./api";
 
 /** Watches due reminders for the signed-in frame: returns how many are due (the nav count) and shows
- *  a toast when a new one comes due while the app is open. Delivery itself happens on the server, so
+ *  a toast (with the chime, when `sound` is on) when a new one comes due while the app is open. Delivery itself happens on the server, so
  *  a closed tab misses nothing: the reminder waits under Reminders. */
-export function useReminderAlerts(): number {
+export function useReminderAlerts(sound = true): number {
   const router = useRouter();
   const due = useReminders("due");
   const seen = useRef<Set<string> | null>(null);
@@ -23,15 +24,17 @@ export function useReminderAlerts(): number {
       seen.current = new Set(ids); // already due when the app opened: the count shows them
       return;
     }
+    let chimed = false;
     for (const reminder of due.data.items) {
       if (seen.current.has(reminder.id)) continue;
+      if (sound && !chimed) chimed = playChime(); // once, however many arrive together
       seen.current.add(reminder.id);
       toast(`Reminder: ${displayTitle(reminder.item)}`, {
         duration: 10_000,
         action: { label: "Open", onClick: () => router.push(`/app/items/${reminder.item.id}`) },
       });
     }
-  }, [due.data, router]);
+  }, [due.data, router, sound]);
 
   return due.data?.items.length ?? 0;
 }

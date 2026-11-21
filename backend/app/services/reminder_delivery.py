@@ -30,6 +30,7 @@ from app.core.time import ensure_utc, utc_now
 from app.models import Reminder, ReminderDelivery, User
 from app.models.enums import ActivityType, DeliveryChannel, DeliveryStatus, ReminderStatus
 from app.services.activity import record_activity
+from app.services.push import PushSender, queue_push, send_pending_pushes
 from app.services.reminders import PENDING, in_quiet_hours
 from app.services.users import effective_preferences
 
@@ -82,9 +83,12 @@ def backoff(attempts: int) -> timedelta:
     return BACKOFF[min(attempts, len(BACKOFF)) - 1]
 
 
-async def deliver_due(session: AsyncSession, now: datetime, channel: Channel | None = None, limit: int = BATCH) -> DeliveryReport:
+async def deliver_due(
+    session: AsyncSession, now: datetime, channel: Channel | None = None, limit: int = BATCH, *, push: bool = False
+) -> DeliveryReport:
     """One pass: deliver every reminder due at `now` that isn't paused, quiet, or waiting for a retry.
-    Commits once at the end; rows are locked for the pass so no other worker touches them."""
+    Commits once at the end; rows are locked for the pass so no other worker touches them. With
+    `push`, each delivered reminder is also queued for Web Push (sent by `send_pending_pushes`)."""
     now = ensure_utc(now)
     channel = channel or InAppChannel()
     report = DeliveryReport()
@@ -94,7 +98,11 @@ async def deliver_due(session: AsyncSession, now: datetime, channel: Channel | N
         .join(User, User.id == Reminder.user_id)
         .outerjoin(
             ReminderDelivery,
-            and_(ReminderDelivery.reminder_id == Reminder.id, ReminderDelivery.schedule_version == Reminder.schedule_version),
+            and_(
+                ReminderDelivery.reminder_id == Reminder.id,
+                ReminderDelivery.schedule_version == Reminder.schedule_version,
+                ReminderDelivery.channel == channel.name,
+            ),
         )
         .where(
             Reminder.status.in_(PENDING),
@@ -157,6 +165,8 @@ async def deliver_due(session: AsyncSession, now: datetime, channel: Channel | N
         delivery.last_error_code = None
         _mark_sent(reminder, now)
         await record_activity(session, user.id, ActivityType.REMINDER_SENT, reminder.intention_id, reminder_id=str(reminder.id), channel=channel.name)
+        if push:
+            await queue_push(session, reminder, now)
         report.delivered.append(str(reminder.id))
 
     await session.commit()
@@ -182,7 +192,7 @@ async def _claim(session: AsyncSession, reminder: Reminder, channel: str) -> Rem
             status=DeliveryStatus.PENDING.value,
             attempts=0,
         )
-        .on_conflict_do_nothing(constraint="uq_reminder_deliveries_version")
+        .on_conflict_do_nothing(constraint="uq_reminder_deliveries_version_channel")
         .returning(ReminderDelivery.id)
     )
     new_id = (await session.execute(statement)).scalar_one_or_none()
@@ -197,6 +207,7 @@ async def run_worker(
     interval: float,
     clock: Callable[[], datetime] = utc_now,
     channel: Channel | None = None,
+    push_sender: PushSender | None = None,
 ) -> None:
     """Delivers due reminders every `interval` seconds until `stop` is set. Errors are logged and the
     loop carries on: one bad pass never stops reminders for good."""
@@ -204,7 +215,10 @@ async def run_worker(
     while not stop.is_set():
         try:
             async with session_factory() as session:
-                report = await deliver_due(session, clock(), channel)
+                report = await deliver_due(session, clock(), channel, push=push_sender is not None)
+            if push_sender is not None:
+                async with session_factory() as session:
+                    await send_pending_pushes(session, clock(), push_sender)
             if report.delivered or report.failed or report.repaired:
                 logger.info(
                     "reminders delivered",

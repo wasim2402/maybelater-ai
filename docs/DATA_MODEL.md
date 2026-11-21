@@ -14,6 +14,7 @@ erDiagram
     categories |o--o{ intentions : groups
     intentions ||--o{ reminders : has
     reminders ||--o{ reminder_deliveries : "delivered by"
+    users ||--o{ push_subscriptions : "devices"
     intentions ||--o{ intention_analyses : "analysed by"
     intentions |o--o{ activities : "history of"
 
@@ -87,7 +88,7 @@ erDiagram
         uuid id PK
         uuid reminder_id FK
         uuid user_id FK
-        int schedule_version "unique with reminder_id"
+        int schedule_version "unique with reminder_id and channel"
         varchar idempotency_key "unique"
         varchar channel
         varchar status "pending | delivered | failed"
@@ -95,6 +96,17 @@ erDiagram
         timestamptz next_attempt_at
         timestamptz delivered_at
         varchar last_error_code
+    }
+    push_subscriptions {
+        uuid id PK
+        uuid user_id FK
+        varchar endpoint "unique, known push services only"
+        varchar p256dh
+        varchar auth
+        varchar label "e.g. Chrome on Windows"
+        timestamptz last_success_at
+        int failure_count
+        timestamptz disabled_at "push service said gone"
     }
     activities {
         uuid id PK
@@ -134,7 +146,8 @@ erDiagram
 | `ix_reminders_due` (partial: scheduled or snoozed) | The delivery worker's due scan |
 | `ix_reminders_user_scheduled` | A user's reminder list |
 | `uq_reminders_one_open_per_intention` (partial, unique: draft, scheduled or snoozed) | One open reminder per item |
-| `uq_reminder_deliveries_version` (`reminder_id`, `schedule_version`) | Each version of a reminder is delivered at most once (`docs/REMINDERS.md`) |
+| `uq_reminder_deliveries_version_channel` (`reminder_id`, `schedule_version`, `channel`) | Each version of a reminder is delivered at most once per channel (in-app, web push) |
+| `uq_push_subscriptions_endpoint` | One subscription per browser endpoint (`docs/NOTIFICATIONS.md`) |
 | `ix_activities_user_created` | History and metrics |
 
 Text search (stage 09) starts with plain PostgreSQL queries. Full-text search or pgvector is added by a later migration only if the need is shown.

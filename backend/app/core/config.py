@@ -52,6 +52,13 @@ class Settings(BaseSettings):
     reminder_worker_enabled: bool = True
     reminder_worker_interval_seconds: float = Field(default=20.0, ge=1.0, le=300.0)
 
+    # Web Push (reminder notifications that arrive with the app closed). Generate the pair once with
+    # `python scripts/generate_vapid_keys.py`; the private key is a secret and stays on the server.
+    vapid_public_key: str = ""
+    vapid_private_key: str = ""
+    # Contact for push services (RFC 8292). A mailto: or https: URL you control; not a user's address.
+    vapid_subject: str = "mailto:notifications@maybelater.example"
+
     @field_validator("cors_origins", mode="before")
     @classmethod
     def _split_origins(cls, value: object) -> object:
@@ -81,6 +88,10 @@ class Settings(BaseSettings):
             if any(o.startswith("http://") and "localhost" not in o for o in self.cors_origins):
                 raise ValueError("CORS_ORIGINS must use https outside development")
         return self
+
+    @property
+    def push_configured(self) -> bool:
+        return bool(self.vapid_public_key and self.vapid_private_key)
 
     @property
     def is_development(self) -> bool:

@@ -8,7 +8,7 @@ A **reminder** is a time the user chose for one saved item. When that time comes
 - **The API makes the choice explicit:** `POST /reminders` requires `confirm`. With `confirm: false` the result is a **draft**, which the worker never delivers.
 - **The database enforces it:** `ck_reminders_approved_before_scheduling` refuses a scheduled, snoozed or sent reminder without `approved_at`.
 - **AI cannot create reminders.** No agent has a reminder tool (a test in `test_agents.py` checks this). An AI-suggested "when" is only `resurface_condition` text.
-- **Only in-app delivery exists.** Email, web push and mobile push are not built, and will not be until consent, unsubscribe, retry and failure handling are designed for them.
+- **Channels:** in-app, plus **Web Push** notifications with sound (opt in per device, easy to turn off; see `docs/NOTIFICATIONS.md`). Email is not built.
 
 ## Lifecycle
 
