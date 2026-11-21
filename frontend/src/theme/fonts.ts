@@ -11,7 +11,7 @@
  * Current pairing, dealt by the Taste Skill for a software product: Gabarito (headings),
  * Figtree (text) and DM Mono (code and shortcuts).
  */
-import { DM_Mono, Figtree, Gabarito } from "next/font/google";
+import { DM_Mono, Figtree, Gabarito, Host_Grotesk, JetBrains_Mono } from "next/font/google";
 
 const display = Gabarito({
   subsets: ["latin"],
@@ -36,3 +36,26 @@ const mono = DM_Mono({
 
 /** Class names that define the font CSS variables. Put them on <html>. */
 export const fontVariables = [display.variable, text.variable, mono.variable].join(" ");
+
+/*
+ * Landing page type (the public page only), dealt by the Taste Skill for a software page:
+ * Host Grotesk for headings and text, JetBrains Mono for code-like details (the first pairing dealt;
+ * all three dealt pairings fail the hero's 46-character stress test, and the real h1 fits in three lines). Mapped to roles in tokens.css (--landing-font-*);
+ * the product app keeps the pairing above.
+ */
+const landingSans = Host_Grotesk({
+  subsets: ["latin"],
+  weight: ["400", "500"],
+  variable: "--font-landing-sans",
+  display: "swap",
+});
+
+const landingMono = JetBrains_Mono({
+  subsets: ["latin"],
+  weight: ["400", "500"],
+  variable: "--font-landing-mono",
+  display: "swap",
+});
+
+/** Class names for the landing page's font variables. Put them on the marketing <html>. */
+export const landingFontVariables = [landingSans.variable, landingMono.variable].join(" ");

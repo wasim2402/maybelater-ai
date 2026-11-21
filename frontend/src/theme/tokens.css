@@ -43,4 +43,12 @@
   --brand-display-weight: 400;          /* headings: size and tight tracking carry them, never bold-and-big */
   --brand-display-tracking: -0.03em;
   --brand-display-tracking-xl: -0.04em; /* hero-size headings */
+
+  /* 5. Landing page type roles (fonts loaded in fonts.ts as --font-landing-*). */
+  --landing-font-display: var(--font-landing-sans), ui-sans-serif, system-ui, sans-serif;
+  --landing-font-text: var(--font-landing-sans), ui-sans-serif, system-ui, sans-serif;
+  --landing-font-mono: var(--font-landing-mono), ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+  --landing-display-weight: 500;
+  --landing-display-tracking: -0.035em;
+  --landing-display-tracking-xl: -0.04em;
 }

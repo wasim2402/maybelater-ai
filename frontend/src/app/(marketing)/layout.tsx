@@ -1,19 +1,17 @@
 import type { Metadata, Viewport } from "next";
 
-import { fontVariables } from "@/theme/fonts";
+import { landingFontVariables } from "@/theme/fonts";
 
 import "./marketing.css";
-import { SmoothScroll } from "./smooth-scroll";
-import { TasteKit } from "./taste-kit";
 
 export const metadata: Metadata = {
   // TODO(stage 14): set metadataBase and the canonical URL once the production domain is known.
-  title: "MaybeLater: a save-for-later app that remembers why",
+  title: "MaybeLater AI: the save-for-later app that remembers why",
   description:
-    "Save links and thoughts in one place. MaybeLater keeps the original, suggests why you saved it and reminds you only when you ask.",
+    "Save links and thoughts in one place. MaybeLater keeps your original, suggests why you saved it and brings it back on the day you pick.",
   openGraph: {
     type: "website",
-    title: "MaybeLater: a save-for-later app that remembers why",
+    title: "MaybeLater AI: the save-for-later app that remembers why",
     description: "Links and notes kept with the reason you saved them, back on the day you choose.",
     images: [{ url: "/share.jpg", width: 1440, height: 900, alt: "The MaybeLater landing page hero" }],
   },
@@ -36,19 +34,22 @@ const KIT_STYLES = [
   "/assets/ui/base.css",
   "/assets/ui/window/fragment.css",
   "/assets/ui/doc/fragment.css",
+  "/assets/scenes/scenes.css",
+  "/assets/scenes/product-assembles-into-its-action/scene.css",
 ];
 
-/* Before first paint: the hero waits for the motion layer (700ms fallback) and moments get their guard. */
+/* Before first paint: the hero waits for the motion layer (700ms fallback); moments and the scene get
+   their guards, so their finished state is styled before their modules load. */
 const KIT_GUARD =
-  "var d=document.documentElement;d.classList.add('m-enter','mo-js');" +
+  "var d=document.documentElement;d.classList.add('m-enter','mo-js','sc-js');" +
   "setTimeout(function(){d.classList.add('m-enter-done')},700);" +
-  "setTimeout(function(){d.classList.add('mo-safe')},2500);";
+  "setTimeout(function(){d.classList.add('mo-safe','sc-safe')},2500);";
 
 /**
  * Root layout for the public landing page. It is a separate root layout from the app, so the
- * Taste Skill kit's global CSS (public/assets) never reaches product screens.
- * Deal (Taste Skill): type software · hero split · nav-centre · close-word · footer-dark ·
- * rhythm space · buttons arrow · mark wordmark · moment iris-opens · radius soft.
+ * Taste Skill kit's global CSS (public/assets) and the landing type never reach product screens.
+ * The deal and the page plan are in the comment at the top of ./page.tsx. The kit runtime and Lenis are
+ * mounted by the page itself (after its own markup has hydrated), not here: the layout hydrates first.
  */
 export default function MarketingRootLayout({ children }: { children: React.ReactNode }) {
   return (
@@ -57,9 +58,9 @@ export default function MarketingRootLayout({ children }: { children: React.Reac
       data-type="software"
       data-radius="soft"
       data-ground="sage"
-      data-buttons="arrow"
+      data-buttons="tonal"
       data-motion=""
-      className={fontVariables}
+      className={landingFontVariables}
       suppressHydrationWarning
     >
       <head>
@@ -72,8 +73,6 @@ export default function MarketingRootLayout({ children }: { children: React.Reac
       </head>
       <body>
         {children}
-        <TasteKit />
-        <SmoothScroll />
       </body>
     </html>
   );

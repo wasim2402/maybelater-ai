@@ -470,3 +470,31 @@ Update this file after each numbered implementation stage. Stage documents live 
   1. `e2e/notifications.spec.ts` has not been run. The user's debug API on port 8000 predates this change (`/notifications/push` returned 404). Restart it so it loads the new code and the VAPID keys, then run `PLAYWRIGHT_CHANNEL=chrome npx playwright test e2e/notifications.spec.ts --project=desktop`.
   2. Automation can't read back notifications Windows displays (`getNotifications()` is empty even for a direct `showNotification`), so whether the notification actually appears is a manual check: use **Send a test notification**.
   3. Notification action buttons (Done or Snooze from the notification) aren't offered: the service worker has no sign-in token by design. Clicking opens the item.
+
+### 2026-11-21 — Landing page redesign (between stages 12 and 13)
+- **Request:** a cinematic, story-driven redesign of the landing page with the Taste Skill, Aceternity UI, GSAP and Lenis, without touching the app.
+- **Summary:**
+  - Followed the skill's workflow: the deal (collage hero, nav cards, close-type, footer columns, tonal buttons, dots mark), a licensed photo search, copy checked by copy-lint, the layout and consistency checks, perf, and the gate.
+  - Ten sections tell the brief's story.
+    - **Scroll-driven parts:** the GSAP chaos-to-clarity moment (sticky, scrubbed), the kit's word-highlight statement and the kit's product-assembles scene.
+    - **Light only:** the Aceternity Spotlight lights the hero frame once.
+    - **Lenis:** landing page only.
+  - **Brand kept:** the client's own palette.
+  - **Type, landing page only:** Host Grotesk and JetBrains Mono, mapped in `tokens.css` and `fonts.ts`, so they can still be changed in one place.
+- **Deviations from the brief, for honesty:**
+  - "Ask your memories anything" shows the real full-text search, because no assistant exists.
+  - Privacy states only implemented practice.
+  - Aceternity is used for the Spotlight only.
+- **Files changed:**
+  - `src/app/(marketing)/{page.tsx,layout.tsx,marketing.css,smooth-scroll.tsx,taste-kit.tsx}`
+  - `src/components/landing/{problem-story.tsx,spotlight.tsx}`
+  - `src/theme/{fonts.ts,tokens.css}`
+  - `public/assets/{scenes/*,moments/word-highlight/*,moments/chaos-to-clarity/*,img/landing/*}` (iris-opens removed), `public/share.jpg`
+  - `docs/DESIGN_SYSTEM.md`
+- **Validation:**
+  - copy-lint: 0 FAIL, 0 WARN.
+  - Layout check at 1440, 1024, 820, 768 and 390: only `hero-lines` (waived).
+  - perf on the production build: 0 FAIL.
+  - Gate: **OPEN 2**, rounds used up. Both open items are section-gaps around the kit's demo scene (its centred, pinned composition), with 5 waivers.
+  - Frontend lint and typecheck pass; vitest 57 passed; `next build` passes.
+  - Live page: every link lands, the main button opens /signup, and there are no console errors.

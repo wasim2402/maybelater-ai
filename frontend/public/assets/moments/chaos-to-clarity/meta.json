@@ -1,0 +1,13 @@
+{
+  "id": "chaos-to-clarity",
+  "kind": "scroll",
+  "fits": ["section"],
+  "pages": ["software"],
+  "look": "Scattered saved things travel into the rows of one list as the section is scrolled; the closing line arrives last. Its own two-screen section, the stage sticky inside it, scrubbed both ways.",
+  "reduced": "The finished state: the list and the closing line (on a phone, the scattered things as a still grid and the closing line).",
+  "phone": "still",
+  "phoneRuns": false,
+  "webgl": 0,
+  "driver": "GSAP ScrollTrigger, src/components/landing/problem-story.tsx",
+  "page-own": true
+}

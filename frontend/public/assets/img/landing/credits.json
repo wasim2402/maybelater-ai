@@ -1,0 +1,77 @@
+{
+  "note": "Credits for the photographs in this folder: photos.mjs credits prints the footer block for the ones the pages use.",
+  "photos": [
+    {
+      "file": "photo-f5666280-960.jpg",
+      "files": [
+        "photo-f5666280-500.jpg",
+        "photo-f5666280-960.jpg"
+      ],
+      "id": "f5666280",
+      "alt": "Tram on Rua Paiva de Andrade, Lisbon Portugal - 2008",
+      "by": "wampile",
+      "licence": "Public domain",
+      "licenceUrl": "https://creativecommons.org/publicdomain/mark/1.0/",
+      "page": "https://commons.wikimedia.org/wiki/File:Tram_on_Rua_Paiva_de_Andrade,_Lisbon_Portugal_-_2008.jpg",
+      "source": "Wikimedia Commons"
+    },
+    {
+      "file": "photo-f100562279.jpg",
+      "files": [
+        "photo-f100562279-500.jpg",
+        "photo-f100562279-960.jpg",
+        "photo-f100562279.jpg"
+      ],
+      "id": "f100562279",
+      "alt": "Ramen Bowl 2",
+      "by": "Shisma",
+      "licence": "CC BY 4.0",
+      "licenceUrl": "https://creativecommons.org/licenses/by/4.0",
+      "page": "https://commons.wikimedia.org/wiki/File:Ramen_Bowl_2.jpg",
+      "source": "Wikimedia Commons"
+    },
+    {
+      "file": "photo-f61756279.jpg",
+      "files": [
+        "photo-f61756279-500.jpg",
+        "photo-f61756279-960.jpg",
+        "photo-f61756279.jpg"
+      ],
+      "id": "f61756279",
+      "alt": "Books in stack with lamps (Unsplash)",
+      "by": "chuttersnap chuttersnap",
+      "licence": "CC0",
+      "licenceUrl": "http://creativecommons.org/publicdomain/zero/1.0/deed.en",
+      "page": "https://commons.wikimedia.org/wiki/File:Books_in_stack_with_lamps_(Unsplash).jpg",
+      "source": "Wikimedia Commons"
+    },
+    {
+      "file": "photo-f593800-960.jpg",
+      "files": [
+        "photo-f593800-500.jpg",
+        "photo-f593800-960.jpg"
+      ],
+      "id": "f593800",
+      "alt": "Camping at Gjende",
+      "by": "Unknown author",
+      "licence": "CC BY 2.0",
+      "licenceUrl": "https://creativecommons.org/licenses/by/2.0",
+      "page": "https://commons.wikimedia.org/wiki/File:Camping_at_Gjende.jpg",
+      "source": "Wikimedia Commons"
+    },
+    {
+      "file": "photo-f31612287-960.jpg",
+      "files": [
+        "photo-f31612287-500.jpg",
+        "photo-f31612287-960.jpg"
+      ],
+      "id": "f31612287",
+      "alt": "Acoustic Guitar 2",
+      "by": "Johnnydeezwax",
+      "licence": "CC BY-SA 3.0",
+      "licenceUrl": "https://creativecommons.org/licenses/by-sa/3.0",
+      "page": "https://commons.wikimedia.org/wiki/File:Acoustic_Guitar_2.jpg",
+      "source": "Wikimedia Commons"
+    }
+  ]
+}

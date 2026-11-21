@@ -1,7 +1,7 @@
 /*
   Landing page styles. The Taste Skill kit (public/assets/*.css) provides the system; this file
   1) feeds the kit's palette and type tokens from src/theme/tokens.css (one source of truth), and
-  2) holds page CSS that the skill allows: only what sits inside a visual.
+  2) holds page CSS the skill allows: what sits inside a visual, plus the section-height rules it names.
   `:root:root` outranks the kit's own :root defaults regardless of stylesheet order.
 */
 @import "../../theme/tokens.css";
@@ -23,38 +23,131 @@
   --p-inv-accent-ink: var(--brand-on-sage);
   --p-inv-action: var(--brand-sage);
   --p-inv-action-ink: var(--brand-on-sage);
-  --font-display: var(--brand-font-display);
-  --font-text: var(--brand-font-text);
-  --font-mono: var(--brand-font-mono);
-  --display-weight: var(--brand-display-weight);
-  --display-tracking: var(--brand-display-tracking);
-  --display-tracking-xl: var(--brand-display-tracking-xl);
-  --ly-scale: 0.98;
+  --font-display: var(--landing-font-display);
+  --font-text: var(--landing-font-text);
+  --font-mono: var(--landing-font-mono);
+  --display-weight: var(--landing-display-weight);
+  --display-tracking: var(--landing-display-tracking);
+  --display-tracking-xl: var(--landing-display-tracking-xl);
 }
 
 /* Focus ring: the sage accent is under 3:1 on paper, so the ring uses the deep sage (same 2px strength). */
 :root:root :focus-visible { outline-color: var(--brand-sage-deep); }
 
-/* ---------- Hero visual: the capture moment (page CSS inside a visual) ---------- */
-.hv { position: absolute; inset: 0; padding: var(--s-7); display: flex; flex-direction: column; gap: var(--s-4); }
-.hv__group { padding: 0 var(--s-1); }
-.hv__card { background: var(--brand-card); border: 1px solid var(--line); border-radius: var(--r-md); padding: var(--s-5); }
-.hv__label { font-size: var(--t-label); font-weight: 500; color: var(--muted); }
-.hv__paste { margin-top: var(--s-2); font: 400 15px/1.5 var(--font-mono); color: var(--ink); background: var(--brand-grey); border-radius: var(--r-sm); padding: 10px 12px; overflow-wrap: anywhere; }
-.hv__row { display: flex; align-items: center; justify-content: space-between; gap: var(--s-3); margin-top: var(--s-3); }
-.hv__saved { display: inline-flex; align-items: center; gap: 6px; font-size: var(--t-small); color: var(--brand-success); font-weight: 500; }
-.hv__btn { white-space: nowrap; display: inline-flex; align-items: center; height: 36px; padding: 0 14px; border-radius: var(--r-sm); background: var(--brand-sage); color: var(--brand-on-sage); font-size: var(--t-small); font-weight: 500; }
-.hv__btn--danger { background: var(--brand-danger); color: #fff; }
-.hv__btn--quiet { background: transparent; border: 1px solid var(--line-strong); color: var(--ink); }
-.hv__sugs { display: grid; gap: var(--s-2); margin-top: var(--s-3); }
-.hv__sug { border: 1px dashed color-mix(in oklab, var(--brand-sage-deep) 50%, transparent); background: color-mix(in oklab, var(--brand-sage-soft) 70%, transparent); border-radius: var(--r-sm); padding: 10px 12px; }
-.hv__sug--kept { border-style: solid; border-color: var(--line); background: var(--brand-paper); }
-.hv__sughead { display: flex; justify-content: space-between; font-size: var(--t-label); font-weight: 500; color: var(--muted); }
-.hv__tag { color: var(--brand-sage-deep); }
-.hv__sug--kept .hv__tag { color: var(--brand-success); }
-.hv__val { margin-top: 2px; font-size: 15px; line-height: 1.45; color: var(--ink); }
-@media (max-width: 1023px) { .hv { padding: var(--s-5); } .hv__group { display: none; } }
-@media (max-width: 639px) { .hv { padding: var(--s-4); } .hv__sug:nth-child(n + 2) { display: none; } .hero__media .ly-float, .hv__saved { display: none; } }
+/* Shared bits inside the page's visuals */
+.ui :is(b, strong) { font-weight: 500; }
+
+/* ---------- Hero: the pill, the frame's light, the inbox window and the small card ---------- */
+.hero__pill { margin-bottom: var(--s-4); font-size: var(--t-small); font-weight: 500; color: var(--muted); }
+.hero__art { isolation: isolate; }
+.hero__art > .lp-spotlight { overflow: hidden; border-radius: inherit; z-index: 0; }
+.lp-spotlight { position: absolute; inset: 0; pointer-events: none; }
+.lp-spotlight::before { content: ""; position: absolute; width: 138%; height: 169%; top: -42%; left: -18%; background: url('data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 3787 2842" fill="none"%3E%3Cg filter="url%28#f%29"%3E%3Cellipse cx="1924.71" cy="273.501" rx="1924.71" ry="273.501" transform="matrix%28-0.822377 -0.568943 -0.568943 0.822377 3631.88 2291.09%29" fill="#fdfbf7" fill-opacity="0.21"/%3E%3C/g%3E%3Cdefs%3E%3Cfilter id="f" x="0.860352" y="0.838989" width="3785.16" height="2840.26" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB"%3E%3CfeFlood flood-opacity="0" result="BackgroundImageFix"/%3E%3CfeBlend mode="normal" in="SourceGraphic" in2="BackgroundImageFix" result="shape"/%3E%3CfeGaussianBlur stdDeviation="151" result="blur"/%3E%3C/filter%3E%3C/defs%3E%3C/svg%3E') center / 100% 100% no-repeat; opacity: 0; animation: lp-spotlight 1.2s cubic-bezier(.22, 1, .36, 1) .2s 1 forwards; }
+@keyframes lp-spotlight { from { opacity: 0; transform: translate(-12%, -10%) scale(.6); } to { opacity: 1; transform: none; } }
+@media (prefers-reduced-motion: reduce) { .lp-spotlight::before { animation: none; opacity: 1; } }
+.hero__art > .ly-piece { z-index: 1; }
+.hero__art .ui-win__body { grid-template-columns: auto minmax(0, 1fr); }
+@media (max-width: 1023px) { .hero__art .ui-win__side { display: none; } .hero__art .ui-win__body { grid-template-columns: minmax(0, 1fr); } }
+.hw { min-width: 0; padding: var(--s-2) 0 var(--s-6); }
+.hw__rows { display: grid; }
+.hw__row { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: var(--s-3); padding: 10px var(--ly-cut-room, 48px) 10px var(--s-4); border-bottom: 1px solid var(--u-line); }
+.hw__text { display: grid; min-width: 0; }
+.hw__text b { font-size: 14px; line-height: 1.35; color: var(--u-ink); }
+.hw__text small { font-size: 12px; line-height: 1.4; color: var(--u-muted); }
+.hw__chip { font-size: 12px; font-weight: 500; padding: 2px 8px; border-radius: 999px; background: var(--u-hover, #f1ede6); color: var(--u-muted); white-space: nowrap; }
+.hw__chip.is-back { background: var(--brand-sage-soft); color: var(--brand-sage-deep); }
+.hw__chip.is-done { background: transparent; color: var(--brand-success); box-shadow: inset 0 0 0 1px var(--u-line); }
+.hc { left: var(--s-6); bottom: var(--s-6); width: 300px; background: var(--brand-card); border: 1px solid var(--line); border-radius: var(--r-md); padding: var(--s-4); box-shadow: 0 12px 32px rgb(42 43 36 / 0.12); display: grid; gap: var(--s-2); }
+.hc__head { display: flex; justify-content: space-between; align-items: center; gap: var(--s-3); margin-bottom: var(--s-1); }
+.hc__head b { font-size: 15px; font-weight: 500; }
+.hc__chip { font-size: 12px; font-weight: 500; padding: 2px 8px; border-radius: 999px; background: var(--brand-sage-soft); color: var(--brand-sage-deep); }
+.hc__line { display: flex; align-items: center; gap: var(--s-2); font-size: 13px; color: var(--muted); }
+.hc__line b { color: var(--ink); font-weight: 500; }
+.hc__line i { display: inline-flex; width: 20px; height: 20px; align-items: center; justify-content: center; border-radius: 6px; background: var(--brand-grey); color: var(--brand-sage-deep); }
+.hc__line .ui-icon { width: 12px; height: 12px; }
+
+/* ---------- Nav cards: a small screen in each panel ---------- */
+.mc { position: absolute; inset: 0; padding: var(--s-4); display: grid; align-content: start; gap: var(--s-2); background: var(--brand-card); }
+.mc__label { font-size: 12px; font-weight: 500; color: var(--muted); }
+.mc__row { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: var(--s-2); font-size: 13px; padding: 6px 8px; border-radius: var(--r-sm); background: var(--brand-paper); white-space: nowrap; }
+.mc__row b { font-size: 12px; font-weight: 500; color: var(--muted); }
+.mc__row i { width: 8px; height: 8px; border-radius: 50%; background: var(--brand-sage); }
+.mc__row--back { background: var(--brand-sage-soft); }
+.mc__row--back b { color: var(--brand-sage-deep); }
+.mc__search { font: 400 14px/1 var(--font-mono); padding: 8px 10px; border: 1px solid var(--line); border-radius: var(--r-sm); background: var(--brand-paper); }
+.mc__search em { font-style: normal; color: var(--brand-sage-deep); }
+
+/* ---------- Problem: scattered saved things become one list (problem-story.tsx) ---------- */
+/* One screen at rest (two on a phone); two screens live (below). */
+.ps { --h: 1; --hm: 2; }
+.ps__stage { display: grid; grid-template-rows: auto minmax(0, 1fr); gap: var(--s-6); height: 100%; }
+.ps__head { display: grid; grid-template-columns: repeat(12, minmax(0, 1fr)); column-gap: var(--s-5); align-items: start; }
+.ps__head h2 { grid-column: 1 / span 6; }
+.ps__lead { grid-column: 8 / -1; margin: 0; }
+.ps__canvas { position: relative; min-height: 0; }
+.ps__item { display: grid; gap: 6px; padding: 10px; background: var(--brand-card); border: 1px solid var(--line); border-radius: var(--r-md); box-shadow: 0 10px 28px rgb(42 43 36 / 0.10); }
+.ps__item img { width: 100%; aspect-ratio: 3 / 2; height: auto; object-fit: cover; border-radius: var(--r-sm); display: block; }
+.ps__src { font-size: 12px; color: var(--muted); }
+.ps__title { font-size: 14px; font-weight: 500; line-height: 1.35; }
+.ps__meta { font-size: 12px; color: var(--muted); font-family: var(--font-mono); }
+.ps__video { position: relative; display: flex; align-items: center; justify-content: center; aspect-ratio: 16 / 9; border-radius: var(--r-sm); background: var(--brand-inv-surface); color: var(--brand-inv-ink); }
+.ps__play { display: inline-flex; width: 36px; height: 36px; border-radius: 50%; align-items: center; justify-content: center; background: rgb(247 242 235 / 0.16); }
+.ps__play svg { width: 16px; height: 16px; }
+.ps__dur { position: absolute; right: 8px; bottom: 6px; font: 400 12px/1 var(--font-mono); }
+.ps__item--note { background: #fbf6dd; }
+.ps__list { padding: var(--s-4); background: var(--brand-card); border: 1px solid var(--line); border-radius: var(--r-lg); box-shadow: 0 16px 40px rgb(42 43 36 / 0.10); }
+.ps__listhead { display: flex; justify-content: space-between; align-items: baseline; padding: 0 var(--s-2) var(--s-3); border-bottom: 1px solid var(--line); }
+.ps__listhead b { font: var(--display-weight) 20px/1.2 var(--font-display); letter-spacing: var(--display-tracking); }
+.ps__listhead span { font-size: 13px; color: var(--muted); }
+.ps__row { display: grid; grid-template-columns: auto minmax(0, 1fr) auto auto; align-items: center; gap: var(--s-3); padding: 14px var(--s-2); border-bottom: 1px solid var(--line); font-size: 16px; }
+.ps__row:last-child { border-bottom: 0; }
+.ps__rowtitle { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ps__dot { width: 10px; height: 10px; border-radius: 3px; background: var(--brand-sage); }
+.ps__dot[data-kind="video"] { background: var(--brand-ink); }
+.ps__dot[data-kind="note"] { background: #d9c46a; }
+.ps__dot[data-kind="tab"] { background: var(--brand-muted); }
+.ps__chip { font-size: 12px; font-weight: 500; padding: 2px 8px; border-radius: 999px; background: var(--brand-grey); color: var(--brand-muted); white-space: nowrap; }
+.ps__chip--back { background: var(--brand-sage-soft); color: var(--brand-sage-deep); }
+.ps__turnline { font: var(--display-weight) var(--t-h3)/1.2 var(--font-display); letter-spacing: var(--display-tracking); }
+.ps__turn p { margin-top: var(--s-3); color: var(--ink); max-width: 40ch; }
+
+/* At rest, 768 and wider (reduced motion, no script): one screen, the closing line beside the list. */
+@media (min-width: 768px) {
+  .ps:not(.is-live) .wrap { display: grid; grid-template-columns: repeat(12, minmax(0, 1fr)); column-gap: var(--s-5); row-gap: var(--s-6); align-items: start; align-content: start; }
+  .ps:not(.is-live) :is(.ps__track, .ps__stage, .ps__canvas) { display: contents; }
+  .ps:not(.is-live) .ps__head { grid-column: 1 / -1; }
+  .ps:not(.is-live) .ps__scatter { display: none; }
+  .ps:not(.is-live) .ps__list { grid-column: 6 / -1; grid-row: 2; }
+  .ps:not(.is-live) .ps__turn { grid-column: 1 / span 5; grid-row: 2; padding-top: var(--s-6); }
+  /* Live: two screens. The stage is held under the header (sticky inside its track) while the scroll
+     scrubs the story; then it lets go and the closing line follows at the section's foot. */
+  .ps.is-live { --h: 2; }
+  .ps.is-live .wrap { height: 100%; display: flex; flex-direction: column; }
+  .ps.is-live .ps__track { flex: 1 1 auto; min-height: 0; }
+  .ps.is-live .ps__stage { position: sticky; top: var(--padt); height: calc(100svh - var(--padt) - var(--padb) - var(--s-10)); }
+  .ps.is-live .ps__scatter { position: absolute; inset: 0; z-index: 2; pointer-events: none; }
+  .ps.is-live .ps__item { position: absolute; left: var(--x); top: var(--y); width: var(--w); rotate: var(--r); will-change: transform; }
+  .ps.is-live .ps__list { margin-left: calc((100% + var(--s-5)) / 12 * 3); }
+  .ps.is-live .ps__turn { flex: none; display: grid; grid-template-columns: repeat(12, minmax(0, 1fr)); column-gap: var(--s-5); padding-top: var(--s-6); }
+  .ps.is-live .ps__turnline { grid-column: 1 / span 6; }
+  .ps.is-live .ps__turn p:not(.ps__turnline) { grid-column: 8 / -1; margin-top: 0; }
+}
+@media (min-width: 768px) and (max-width: 1023px) {
+  .ps__head h2 { grid-column: 1 / -1; }
+  .ps__lead { grid-column: 1 / -1; margin-top: var(--s-3); }
+  .ps:not(.is-live) .ps__turn { grid-column: 1 / -1; grid-row: 3; padding-top: 0; }
+  .ps:not(.is-live) .ps__list { grid-column: 1 / -1; }
+  .ps.is-live .ps__list { margin-left: 0; }
+}
+/* A phone: the scattered things as a still grid of four, then the closing line; the list waits for the next section. */
+@media (max-width: 767px) {
+  .ps__head { display: block; }
+  .ps__lead { margin-top: var(--s-3); }
+  .ps__scatter { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--s-3); }
+  .ps__item:nth-child(n + 5) { display: none; }
+  .ps__list { display: none; }
+  .ps__turn { margin-top: var(--s-6); }
+}
 
 /* ---------- App frame (sections-library.md, app-frame: the whole recipe) ---------- */
 .app.ui { display: grid; grid-template-columns: minmax(0, 5fr) minmax(0, 7fr); margin-top: var(--s-7); background: var(--u-bg); border: 1px solid var(--u-border); border-radius: var(--u-r); box-shadow: var(--u-shadow); }
@@ -76,55 +169,144 @@
   .app > .app__pane--list { display: none; }
   .app > .app__pane + .app__pane { border-top: 0; }
 }
-
-/* ---------- Section heights the skill allows as page CSS ---------- */
-/* #how keeps its three steps in one row from 1024 (no half-empty row); the tablet stacks them over two screens. */
-@media (min-width: 1024px) { #how .grid > .card.span-4 { grid-column: span 4; } }
-/* Tablet: each step card puts its words beside its panel, so the three steps hold one screen;
-   the FAQ drops its picture and the suggestions frame gets lower, so both stay one screen. */
-@media (min-width: 640px) and (max-width: 1023px) {
-  #how .card--open { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); column-gap: var(--s-5); align-items: stretch; }
-  #how .card--open > .panel { margin: 0; --p-h: 200px; }
-  #suggestions .frame--split { --ratio: 56%; }
-}
-/* FAQ below 1024: the tablet keeps the split (words and picture left, answers right);
-   the phone shows the picture as a compact strip: the question and its two buttons on one line. */
-@media (min-width: 640px) and (max-width: 1023px) {
-  #faq .grid--top > .span-5 { grid-column: 1 / span 5; }
-  #faq .grid--top > .faq { grid-column: 6 / -1; }
-  #faq .faq-visual { aspect-ratio: 9 / 17; }
-}
-@media (max-width: 639px) {
-  #faq .faq-visual { aspect-ratio: auto; height: 72px; }
-  #faq .fv { grid-template-columns: minmax(0, 1fr) auto; align-items: center; padding: var(--s-3) var(--s-4); }
-  #faq .fv > .hv__val { display: none; }
-  #faq .fv .hv__row { margin: 0; }
-  #faq .fv .hv__btn--quiet { display: none; }
-}
-@media (max-width: 639px) { #how { --hm: 2; } #suggestions .frame--split { --ratio: 72%; } }
-/* close-word: the name is hand-set per breakpoint so its 10 letters stay inside the .wrap. */
-/* 10 letters at about 4.8 em wide: the name runs from the left line to the right line. */
-:root:root .close__word { font-size: min(calc((100vw - 2 * var(--gut)) / 4.85), 264px); padding-bottom: 0.14em; }
-@media (max-width: 639px) {
-  :root:root .close__word { font-size: calc((100vw - 2 * var(--gut)) / 4.85); }
-  /* one phone screen: the footer keeps its links and drops the line that repeats the hero */
-  .closing__links .footer__lede, .closing__links .footer__col--extra { display: none; }
-}
-
 /* The open pane: the doc fills the pane (no empty strip beside it); its note sits in the right gutter. */
 .app > .app__pane--open > .ui-doc { width: 100%; min-height: 100%; padding-right: 248px; }
 .app > .app__pane--open .ui-doc__page { border-radius: 0; }
 .app > .app__pane--open .ui-doc__note { right: 24px; top: 72px; }
 @media (max-width: 639px) { .app > .app__pane--open > .ui-doc { padding-right: 0; } .app > .app__pane--open .ui-doc__note { position: relative; right: auto; top: auto; width: auto; margin: 0 16px 16px; } }
 
-/* ---------- Step panels and the suggestions frame (inside visuals) ---------- */
-#how .panel { --p-h: 260px; }
-@media (max-width: 639px) { #how .panel { --p-h: 300px; } }
-.sp { position: absolute; inset: var(--s-5) var(--s-5) auto var(--s-5); display: grid; gap: var(--s-2); }
-@media (max-width: 639px) { .sp { inset: var(--s-4) var(--s-4) auto var(--s-4); } .sp .hv__sug:nth-child(n + 2), .sp .hv__card:nth-child(n + 2) { display: none; } }
-.sp .hv__card { padding: var(--s-4); }
-.sg { position: absolute; inset: 0; display: grid; align-content: start; gap: var(--s-3); padding: 56px; }
-.faq-visual { aspect-ratio: 16 / 9; }
-.fv { position: absolute; inset: 0; display: grid; align-content: center; gap: var(--s-2); padding: var(--s-6); }
-.sg__title { font-size: var(--t-card); font-weight: 500; color: var(--ink); }
-@media (max-width: 639px) { .sg { padding: var(--s-5); } .fv { padding: var(--s-5); } }
+/* ---------- Statement (word-highlight) ---------- */
+:root:root .promise__text { font-size: clamp(36px, 6.2vw, 92px); line-height: 1.06; letter-spacing: var(--display-tracking-xl); max-width: 22ch; }
+
+/* ---------- Tabs tour: the panels and the five screens ---------- */
+.tour__panels { min-height: 132px; }
+.tour__panel p { margin-top: var(--s-2); }
+.frame.frame--split.tour__frame { --ratio: 112%; }
+.frame.frame--split.search__frame { --ratio: 100%; }
+.tour__screen { position: absolute; inset: 0; }
+.tour__screen[hidden] { display: none; }
+.ts { position: absolute; left: var(--s-8); right: var(--s-8); top: var(--s-8); padding: var(--s-6); display: grid; gap: var(--s-3); background: var(--brand-card); border: 1px solid var(--line); border-radius: var(--r-md); box-shadow: 0 14px 36px rgb(42 43 36 / 0.10); }
+.ts__label, .ts__group { font-size: 13px; font-weight: 500; color: var(--muted); }
+.ts__group { margin-top: var(--s-2); }
+.ts__paste { font: 400 14px/1.5 var(--font-mono); background: var(--brand-grey); border-radius: var(--r-sm); padding: 10px 12px; overflow-wrap: anywhere; }
+.ts__note { font-size: 14px; color: var(--muted); }
+.ts__row { display: flex; align-items: center; justify-content: flex-end; gap: var(--s-2); margin-top: var(--s-2); }
+.ts__saved { margin-right: auto; display: inline-flex; align-items: center; gap: 6px; font-size: 14px; font-weight: 500; color: var(--brand-success); }
+.ts__saved .ui-icon, .ts__reason .ui-icon { width: 14px; height: 14px; }
+.ts__btn { display: inline-flex; align-items: center; height: 34px; padding: 0 14px; border-radius: var(--r-sm); background: var(--brand-sage); color: var(--brand-on-sage); font-size: 14px; font-weight: 500; }
+.ts__btn--quiet { background: transparent; color: var(--ink); box-shadow: inset 0 0 0 1px var(--line-strong); }
+.ts__title { font: var(--display-weight) 22px/1.25 var(--font-display); letter-spacing: var(--display-tracking); }
+.ts__sug { display: grid; grid-template-columns: 1fr auto; gap: 2px var(--s-3); padding: 10px 12px; border-radius: var(--r-sm); border: 1px dashed color-mix(in oklab, var(--brand-sage-deep) 50%, transparent); background: color-mix(in oklab, var(--brand-sage-soft) 70%, transparent); font-size: 13px; color: var(--muted); }
+.ts__sug b { color: var(--brand-sage-deep); font-weight: 500; }
+.ts__sug p { grid-column: 1 / -1; font-size: 15px; color: var(--ink); }
+.ts__sug.is-kept { border-style: solid; border-color: var(--line); background: var(--brand-paper); }
+.ts__sug.is-kept b { color: var(--brand-success); }
+.ts__lists { display: flex; flex-wrap: wrap; gap: 6px; }
+.ts__lists span { font-size: 13px; padding: 4px 10px; border-radius: 999px; box-shadow: inset 0 0 0 1px var(--line); }
+.ts__lists .is-on { background: var(--ink); color: var(--bg); box-shadow: none; }
+.ts__item { display: flex; justify-content: space-between; gap: var(--s-3); font-size: 15px; padding: 8px 0; border-bottom: 1px solid var(--line); }
+.ts__item em { font-style: normal; font-size: 13px; color: var(--brand-sage-deep); white-space: nowrap; }
+.ts__item.is-done { color: var(--muted); }
+.ts__item.is-done em { color: var(--brand-success); }
+.ts__reason { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 500; color: var(--brand-sage-deep); }
+@media (max-width: 1023px) { .ts { left: var(--s-5); right: var(--s-5); top: var(--s-5); padding: var(--s-5); } .frame.frame--split.tour__frame, .frame.frame--split.search__frame { --ratio: 64%; } }
+@media (max-width: 639px) { .ts { left: var(--s-4); right: var(--s-4); top: var(--s-4); padding: var(--s-4); } .frame.frame--split.tour__frame, .frame.frame--split.search__frame { --ratio: 100%; } .tour__panels { min-height: 0; } }
+
+/* ---------- Scene screen (product-assembles): one saved article ---------- */
+.ds { font-size: 15px; }
+.ds__head { display: flex; justify-content: space-between; align-items: center; gap: var(--s-3); font: 400 13px/1.4 var(--font-mono); color: var(--muted); }
+.ds__head span { display: inline-flex; align-items: center; gap: 6px; }
+.ds__head .ui-icon, .ds__saved .ui-icon { width: 14px; height: 14px; }
+.ds__saved { display: inline-flex; align-items: center; gap: 6px; font-weight: 500; color: var(--brand-success); }
+.ds__saved small, .ds__head small { font-weight: 400; color: var(--muted); }
+.ds__field { display: grid; grid-template-columns: 9.5em minmax(0, 1fr); gap: var(--s-3); }
+.ds__field span { color: var(--muted); font-size: 13px; padding-top: 2px; }
+.ds__field--back { color: var(--brand-sage-deep); font-weight: 500; }
+.ds__done { display: inline-flex; align-items: center; gap: 8px; font-size: 14px; font-weight: 500; color: var(--brand-success); }
+.ds__done i { width: 8px; height: 8px; border-radius: 50%; background: var(--brand-success); }
+
+/* ---------- Dark band: resurfaced cards ---------- */
+.rc .panel { --ratio: 66%; }
+.rc__photo .frame__img { object-fit: cover; }
+/* The guitar: cropped past the case's maker label (credited as adapted). */
+.rc__photo .frame__img.rc__crop { transform: scale(1.4); transform-origin: 88% 62%; }
+.rc__reason { margin-top: var(--s-4); font-size: var(--t-small); font-weight: 500; color: var(--brand-sage); }
+.rc .t-card { margin-top: var(--s-1); }
+.rc__actions { display: flex; gap: var(--s-2); margin-top: var(--s-2); font-size: var(--t-small); color: var(--muted); }
+.rc__actions span + span::before { content: "·"; margin-right: var(--s-2); color: var(--muted); }
+.rc__actions .is-main { color: var(--brand-sage); font-weight: 500; }
+.rn { position: absolute; inset: var(--s-5); padding: var(--s-5); border-radius: var(--r-md); background: #fbf6dd; color: #2a2b24; display: grid; align-content: start; gap: var(--s-3); }
+.rn__label { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 500; color: #60615d; }
+.rn__label .ui-icon { width: 14px; height: 14px; }
+.rn__text { font: var(--display-weight) 20px/1.35 var(--font-display); letter-spacing: var(--display-tracking); }
+
+/* ---------- Search screen ---------- */
+.ss { position: absolute; left: var(--s-8); right: var(--s-8); top: var(--s-8); padding: var(--s-5); display: grid; gap: var(--s-4); background: var(--brand-card); border: 1px solid var(--line); border-radius: var(--r-md); box-shadow: 0 14px 36px rgb(42 43 36 / 0.10); }
+.ss__field { display: flex; align-items: center; gap: var(--s-3); height: 48px; padding: 0 var(--s-4); border: 1px solid var(--line-strong); border-radius: var(--r-sm); font: 400 16px/1 var(--font-mono); }
+.ss__field em { font-style: normal; color: var(--brand-sage-deep); }
+.ss__field small { margin-left: auto; font: 400 13px/1 var(--font-text); color: var(--muted); }
+.ss__field .ui-icon { width: 16px; height: 16px; color: var(--muted); }
+.ss__filters { display: flex; flex-wrap: wrap; gap: 6px; }
+.ss__filters span { font-size: 13px; padding: 4px 10px; border-radius: 999px; box-shadow: inset 0 0 0 1px var(--line); }
+.ss__filters .is-on { background: var(--ink); color: var(--bg); box-shadow: none; }
+.ss__rows { display: grid; }
+.ss__rows li { display: grid; gap: 2px; padding: 10px 0; border-bottom: 1px solid var(--line); }
+.ss__rows li:last-child { border-bottom: 0; }
+.ss__rows b { font-size: 15px; }
+.ss__rows small { font-size: 13px; color: var(--muted); }
+.ss__rows mark { background: var(--brand-sage-soft); color: inherit; border-radius: 3px; padding: 0 2px; }
+@media (max-width: 1023px) { .ss { left: var(--s-5); right: var(--s-5); top: var(--s-5); } }
+@media (max-width: 639px) { .ss { left: var(--s-4); right: var(--s-4); top: var(--s-4); padding: var(--s-4); } }
+
+/* ---------- Privacy rows: the value carries the sentence ---------- */
+.rows.rows--privacy > li { grid-template-columns: 9.5em minmax(0, 1fr); padding-block: var(--s-5); align-items: baseline; }
+.rows.rows--privacy > li:first-child { padding-top: 0; }
+.rows.rows--privacy .rows__value { white-space: normal; text-align: left; font-size: var(--t-lead); line-height: 1.45; }
+@media (max-width: 639px) { .rows.rows--privacy > li { grid-template-columns: minmax(0, 1fr); padding-block: var(--s-4); } }
+
+/* ---------- Section heights and phone fixes (layout-v4.md) ---------- */
+/* The three resurfaced cards stay in one row from 1024 (no 2+1 row); the tablet stacks them over two screens. */
+@media (min-width: 1024px) { #rediscover .grid > .card.span-4 { grid-column: span 4; } }
+@media (min-width: 640px) and (max-width: 1023px) { #rediscover { --h: 2; } }
+/* Privacy on the tablet: the stacked rows take a little more air so the screen is not half empty. */
+@media (min-width: 640px) and (max-width: 1023px) { .rows.rows--privacy > li { padding-block: var(--s-6); } }
+/* A phone: the hero keeps to one screen (the pill and the proof line wait for a wider screen), and the
+   bar keeps the logo, the main button and the menu (Sign in is in the menu sheet and the footer). */
+@media (max-width: 639px) {
+  .hero__pill, .hero__proof { display: none; }
+  .nav__actions > .nav__link { display: none; }
+  .nav .nav__actions > .btn.btn--primary { padding-inline: var(--s-4); }
+  #rediscover { --hm: 2; }
+  /* the problem's still: one screen, four things and the closing line */
+  .ps { --hm: 1; }
+  .ps__src, .ps__turn p:not(.ps__turnline) { display: none; }
+  .ps__item { padding: 8px; gap: 4px; }
+  .ps__item img, .ps__video { aspect-ratio: 4 / 3; }
+  .frame.pv { min-height: 320px; }
+}
+
+/* Privacy: one suggestion waiting for a decision (nothing joins an item until it is kept) */
+.frame.pv { padding: var(--s-6); min-height: 440px; display: flex; flex-direction: column; justify-content: center; gap: var(--s-4); }
+.pv__card { display: grid; gap: var(--s-2); padding: var(--s-4); border-radius: var(--r-sm); border: 1px dashed color-mix(in oklab, var(--brand-sage-deep) 50%, transparent); background: color-mix(in oklab, var(--brand-sage-soft) 70%, var(--brand-card)); }
+.pv__head { display: flex; justify-content: space-between; font-size: 13px; color: var(--muted); }
+.pv__head b { color: var(--brand-sage-deep); font-weight: 500; }
+.pv__val { font-size: 16px; color: var(--ink); }
+.pv__val--mono { font: 400 14px/1.5 var(--font-mono); overflow-wrap: anywhere; }
+.pv__card--kept { border-style: solid; border-color: var(--line); background: var(--brand-card); }
+.pv__card--kept .pv__head b { color: var(--brand-success); }
+.pv__row { display: flex; justify-content: flex-end; gap: var(--s-2); }
+
+/* The demo's finished screen on a phone (the scene shows it at rest there): roomier rows fill its screen. */
+@media (max-width: 767px) { .ds { font-size: 16px; } .ds .pa__row { padding-block: 14px; } }
+@media (max-width: 639px) { #rediscover .card.rc .panel { --p-h: 296px; } }
+
+/* The nav on small phones: the wordmark drops " AI" under 640 and shows the mark alone under 360, so the
+   bar keeps the main button and the menu inside the lines (the link keeps its full name for readers). */
+@media (max-width: 639px) { .nav__bar .logo__ai { display: none; } #privacy { --hm: 2; } }
+@media (max-width: 359px) { .nav__bar .logo__name { display: none; } }
+
+/* The demo scene's step list: one step a line with air between, at lead size (inside the scene's copy). */
+#demo .pa__steps { display: grid; gap: var(--s-4); margin-top: var(--s-6); }
+#demo .pa__steps > li { font-size: var(--t-lead); line-height: 1.4; }
+/* Privacy on a phone fills its two screens: roomier rows. */
+@media (max-width: 639px) { .rows.rows--privacy > li { padding-block: var(--s-4); } }
