@@ -1,12 +1,62 @@
-/**
- * UI model for a saved item ("intention"). The API contract is finalised in stages 04 and 06;
- * keep this type in step with the backend response schema when it lands.
- */
-export type IntentionStatus = "inbox" | "scheduled" | "resurfaced" | "snoozed" | "completed" | "archived";
+import { z } from "zod";
 
-export type SourceType = "url" | "text";
+/** Mirrors backend app/schemas/intentions.py. */
+export const intentionStatusSchema = z.enum(["inbox", "active", "completed", "archived"]);
+export const analysisStatusSchema = z.enum(["pending", "ready", "failed", "off"]);
+export const sourceTypeSchema = z.enum(["text", "url", "image", "voice"]);
 
-/** Whether a field's value came from AI and what the user did with it. */
+export const categorySchema = z.object({
+  id: z.string().uuid(),
+  name: z.string(),
+  slug: z.string(),
+  is_system: z.boolean(),
+});
+
+export const intentionSchema = z.object({
+  id: z.string().uuid(),
+  source_type: sourceTypeSchema,
+  original_content: z.string(),
+  original_url: z.string().nullable(),
+  user_note: z.string().nullable(),
+  title: z.string().nullable(),
+  summary: z.string().nullable(),
+  intent: z.string().nullable(),
+  category: categorySchema.nullable(),
+  tags: z.array(z.string()),
+  resurface_condition: z.string().nullable(),
+  field_states: z.record(z.string(), z.string()),
+  analysis_status: analysisStatusSchema,
+  status: intentionStatusSchema,
+  resurface_at: z.string().nullable(),
+  snoozed_until: z.string().nullable(),
+  completed_at: z.string().nullable(),
+  archived_at: z.string().nullable(),
+  created_at: z.string(),
+  updated_at: z.string(),
+});
+
+export const intentionPageSchema = z.object({
+  items: z.array(intentionSchema),
+  next_cursor: z.string().nullable(),
+});
+
+export const captureResultSchema = z.object({
+  result: z.enum(["created", "duplicate", "replayed"]),
+  item: intentionSchema,
+});
+
+export type IntentionStatus = z.infer<typeof intentionStatusSchema>;
+export type AnalysisState = z.infer<typeof analysisStatusSchema>;
+export type SourceType = z.infer<typeof sourceTypeSchema>;
+export type Category = z.infer<typeof categorySchema>;
+export type Intention = z.infer<typeof intentionSchema>;
+export type IntentionPage = z.infer<typeof intentionPageSchema>;
+export type CaptureResult = z.infer<typeof captureResultSchema>;
+
+/** Inbox filter tabs; "open" = inbox + active. */
+export type StatusFilter = "open" | "completed" | "archived" | "all";
+
+/** Whether a field's value came from AI and what the user did with it (stage 07 shows these). */
 export type SuggestionState = "suggested" | "accepted" | "edited" | "dismissed";
 
 export interface SuggestedField {
@@ -16,20 +66,13 @@ export interface SuggestedField {
   state: SuggestionState;
 }
 
-export type AnalysisState = "pending" | "ready" | "failed" | "off";
-
-export interface Intention {
-  id: string;
-  sourceType: SourceType;
-  /** Exactly what the user captured. Never overwritten by AI. */
-  originalContent: string;
-  url: string | null;
+export type IntentionUpdate = Partial<{
   title: string;
-  /** Why the user saved it, in their words or an accepted suggestion. */
-  reason: string | null;
-  category: string | null;
+  summary: string;
+  intent: string;
+  user_note: string;
+  category_id: string | null;
+  tags: string[];
+  resurface_condition: string;
   status: IntentionStatus;
-  analysis: AnalysisState;
-  createdAt: string;
-  remindAt: string | null;
-}
+}>;

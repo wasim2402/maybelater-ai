@@ -16,9 +16,12 @@ import { captureSchema, detectSourceType, toCaptureInput, type CaptureInput, typ
 
 gsap.registerPlugin(useGSAP);
 
+export type CaptureOutcome = "created" | "duplicate" | "replayed";
+
 interface CaptureComposerProps {
-  /** Persists the capture. Reject with an Error to show its message; the typed text is kept. */
-  onCapture: (input: CaptureInput) => Promise<void>;
+  /** Persists the capture. Reject with an Error to show its message; the typed text is kept.
+   *  `requestId` names this attempt: it stays the same across retries until a save is confirmed. */
+  onCapture: (input: CaptureInput, requestId: string) => Promise<CaptureOutcome>;
   autoFocus?: boolean;
   className?: string;
 }
@@ -30,7 +33,10 @@ interface CaptureComposerProps {
 export function CaptureComposer({ onCapture, autoFocus, className }: CaptureComposerProps) {
   const id = useId();
   const [showNote, setShowNote] = useState(false);
-  const [saved, setSaved] = useState(false);
+  const [saved, setSaved] = useState<CaptureOutcome | null>(null);
+  // One id per attempt: a retry of the same text after a failure (e.g. the network dropped after the
+  // server saved) reuses it, so the server returns the saved item instead of storing a second copy.
+  const [attempt, setAttempt] = useState<{ id: string; content: string } | null>(null);
   const [serverError, setServerError] = useState<string | null>(null);
   const rootRef = useRef<HTMLFormElement>(null);
 
@@ -57,12 +63,16 @@ export function CaptureComposer({ onCapture, autoFocus, className }: CaptureComp
 
   const onSubmit = handleSubmit(async (values) => {
     setServerError(null);
-    setSaved(false);
+    setSaved(null);
+    const input = toCaptureInput(values);
+    const current = attempt && attempt.content === input.content ? attempt : { id: crypto.randomUUID(), content: input.content };
+    setAttempt(current);
     try {
-      await onCapture(toCaptureInput(values));
+      const outcome = await onCapture(input, current.id);
+      setAttempt(null);
       reset();
       setShowNote(false);
-      setSaved(true);
+      setSaved(outcome);
       confirmSaved();
     } catch (error) {
       setServerError(error instanceof Error ? error.message : "Saving failed. Your text is still here; try again.");
@@ -93,7 +103,7 @@ export function CaptureComposer({ onCapture, autoFocus, className }: CaptureComp
                 void onSubmit();
               }
             }}
-            {...register("content", { onChange: () => setSaved(false) })}
+            {...register("content", { onChange: () => setSaved(null) })}
           />
           <span
             aria-live="polite"
@@ -157,7 +167,11 @@ export function CaptureComposer({ onCapture, autoFocus, className }: CaptureComp
       </div>
 
       <div aria-live="polite" className="min-h-6">
-        {saved ? <SuccessNote>Saved to your inbox.</SuccessNote> : null}
+        {saved === "duplicate" ? (
+          <SuccessNote>That link is already in your inbox.</SuccessNote>
+        ) : saved ? (
+          <SuccessNote>Saved to your inbox.</SuccessNote>
+        ) : null}
         {serverError ? (
           <p role="alert" className="text-sm text-destructive">
             {serverError}

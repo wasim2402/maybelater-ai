@@ -8,7 +8,7 @@ import { cn } from "cn";
 
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { CaptureComposer } from "@/features/capture/capture-composer";
+import { CaptureComposer, type CaptureOutcome } from "@/features/capture/capture-composer";
 import type { CaptureInput } from "@/features/capture/capture-schema";
 
 export interface NavItem {
@@ -27,7 +27,10 @@ export const APP_NAV: NavItem[] = [
 interface AppShellProps {
   children: React.ReactNode;
   /** Saves a capture. Without it (until stage 06) the capture buttons are not shown. */
-  onCapture?: (input: CaptureInput) => Promise<void>;
+  onCapture?: (input: CaptureInput, requestId: string) => Promise<CaptureOutcome>;
+  /** Optional control of the capture dialog (e.g. an empty state's "Save your first link" button). */
+  captureOpen?: boolean;
+  onCaptureOpenChange?: (open: boolean) => void;
   /** Shown at the foot of the sidebar: who is signed in. */
   account?: { name: string; email: string };
   nav?: NavItem[];
@@ -41,10 +44,21 @@ interface AppShellProps {
  * The authenticated app frame: a quiet sidebar on desktop, a top bar and bottom tabs on phones,
  * and one capture button that is always one tap away.
  */
-export function AppShell({ children, onCapture, account, nav = APP_NAV, current, framed = false }: AppShellProps) {
+export function AppShell({
+  children,
+  onCapture,
+  account,
+  nav = APP_NAV,
+  current,
+  framed = false,
+  captureOpen: controlledOpen,
+  onCaptureOpenChange,
+}: AppShellProps) {
   const pathname = usePathname();
   const active = current ?? pathname;
-  const [captureOpen, setCaptureOpen] = useState(false);
+  const [ownOpen, setOwnOpen] = useState(false);
+  const captureOpen = controlledOpen ?? ownOpen;
+  const setCaptureOpen = onCaptureOpenChange ?? setOwnOpen;
 
   const isActive = (href: string) => (href === "/app" ? active === "/app" : active.startsWith(href));
 
@@ -144,7 +158,14 @@ export function AppShell({ children, onCapture, account, nav = APP_NAV, current,
               A link or a thought. You can add details later.
             </DialogDescription>
           </DialogHeader>
-          <CaptureComposer onCapture={onCapture} autoFocus />
+          <CaptureComposer
+            autoFocus
+            onCapture={async (input, requestId) => {
+              const outcome = await onCapture(input, requestId);
+              setCaptureOpen(false); // the shell's toast confirms the save
+              return outcome;
+            }}
+          />
         </DialogContent>
       </Dialog>
       ) : null}

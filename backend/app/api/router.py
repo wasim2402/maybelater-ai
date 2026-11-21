@@ -1,7 +1,8 @@
 from fastapi import APIRouter
 
-from app.api.routes import health, me
+from app.api.routes import health, intentions, me
 
 api_router = APIRouter(prefix="/api/v1")
 api_router.include_router(health.router)
 api_router.include_router(me.router)
+api_router.include_router(intentions.router)

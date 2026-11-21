@@ -1,17 +1,8 @@
 "use client";
 
-import { format } from "date-fns";
-import {
-  Archive,
-  BellRing,
-  CheckCircle2,
-  Clock3,
-  Link2,
-  MoreHorizontal,
-  NotebookPen,
-  Sparkles,
-  Trash2,
-} from "lucide-react";
+import { formatDistanceToNowStrict } from "date-fns";
+import { Archive, ArchiveRestore, CheckCircle2, Link2, MoreHorizontal, NotebookPen, RotateCcw, Trash2 } from "lucide-react";
+import Link from "next/link";
 import { cn } from "cn";
 
 import {
@@ -22,10 +13,10 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 
-import { CategoryLabel, StatusLabel } from "./labels";
+import { AnalysisLabel, CategoryLabel, StatusLabel } from "./labels";
 import type { Intention } from "./types";
 
-export type IntentionAction = "complete" | "snooze" | "archive" | "delete";
+export type IntentionAction = "complete" | "reopen" | "archive" | "restore" | "delete";
 
 interface IntentionRowProps {
   item: Intention;
@@ -34,7 +25,7 @@ interface IntentionRowProps {
   className?: string;
 }
 
-function hostOf(url: string | null) {
+export function hostOf(url: string | null) {
   if (!url) return null;
   try {
     return new URL(url).hostname.replace(/^www\./, "");
@@ -43,11 +34,17 @@ function hostOf(url: string | null) {
   }
 }
 
+export function displayTitle(item: Intention) {
+  return item.title || hostOf(item.original_url) || item.original_content.slice(0, 80);
+}
+
 /** One saved item in a list: what it is, why it was saved, its state, and its actions. */
 export function IntentionRow({ item, href, onAction, className }: IntentionRowProps) {
-  const SourceIcon = item.sourceType === "url" ? Link2 : NotebookPen;
-  const host = hostOf(item.url);
-  const done = item.status === "completed" || item.status === "archived";
+  const SourceIcon = item.source_type === "url" ? Link2 : NotebookPen;
+  const host = hostOf(item.original_url);
+  const closed = item.status === "completed" || item.status === "archived";
+  const title = displayTitle(item);
+  const saved = formatDistanceToNowStrict(new Date(item.created_at), { addSuffix: true });
 
   return (
     <li
@@ -56,62 +53,60 @@ export function IntentionRow({ item, href, onAction, className }: IntentionRowPr
         className,
       )}
     >
-      <span
-        aria-hidden
-        className="mt-0.5 flex size-9 items-center justify-center rounded-md bg-beige text-ink"
-      >
+      <span aria-hidden className="mt-0.5 flex size-9 items-center justify-center rounded-md bg-beige text-ink">
         <SourceIcon className="size-4" />
       </span>
 
       <div className="min-w-0">
-        <h3 className={cn("text-base leading-snug font-medium tracking-normal", done && "text-muted-foreground line-through decoration-1")}>
+        <h3 className={cn("text-base leading-snug font-medium tracking-normal break-words", closed && "text-muted-foreground")}>
           {href ? (
-            <a href={href} className="outline-none after:absolute after:inset-0 after:rounded-lg focus-visible:after:outline-2 focus-visible:after:outline-ring">
-              {item.title}
-            </a>
+            <Link href={href} className="outline-none after:absolute after:inset-0 after:rounded-lg focus-visible:after:outline-2 focus-visible:after:outline-ring">
+              {title}
+            </Link>
           ) : (
-            item.title
+            title
           )}
         </h3>
-        {item.reason ? (
-          <p className="mt-0.5 line-clamp-2 text-[15px] leading-normal text-ink/85">{item.reason}</p>
-        ) : item.analysis === "pending" ? (
-          <p className="mt-0.5 inline-flex items-center gap-1.5 text-sm text-muted-foreground">
-            <Sparkles aria-hidden className="size-3.5 animate-pulse text-sage-deep" />
-            Working out why you saved this
-          </p>
+        {item.user_note || item.intent ? (
+          <p className="mt-0.5 line-clamp-2 text-[15px] leading-normal text-ink/85">{item.user_note || item.intent}</p>
         ) : null}
         <div className="mt-2 flex flex-wrap items-center gap-1.5">
-          <StatusLabel status={item.status} />
-          {item.category ? <CategoryLabel>{item.category}</CategoryLabel> : null}
-          {item.remindAt ? (
-            <span className="inline-flex h-6 items-center gap-1 text-[13px] text-muted-foreground">
-              <BellRing aria-hidden className="size-3.5" />
-              {format(new Date(item.remindAt), "EEE d MMM, HH:mm")}
-            </span>
-          ) : null}
-          {host ? <span className="truncate text-[13px] text-muted-foreground">{host}</span> : null}
+          {item.status !== "inbox" ? <StatusLabel status={item.status} /> : null}
+          <AnalysisLabel state={item.analysis_status} />
+          {item.category ? <CategoryLabel>{item.category.name}</CategoryLabel> : null}
+          <span className="text-[13px] text-muted-foreground">
+            {host ? `${host} · ` : ""}saved <time dateTime={item.created_at}>{saved}</time>
+          </span>
         </div>
       </div>
 
       {onAction ? (
         <DropdownMenu>
           <DropdownMenuTrigger
-            aria-label={`Actions for ${item.title}`}
+            aria-label={`Actions for ${title}`}
             className="relative z-10 -mr-1 flex size-11 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-beige hover:text-ink focus-visible:outline-2 focus-visible:outline-ring"
           >
             <MoreHorizontal className="size-5" aria-hidden />
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="w-52">
-            <DropdownMenuItem onClick={() => onAction("complete", item)}>
-              <CheckCircle2 aria-hidden /> Mark as done
-            </DropdownMenuItem>
-            <DropdownMenuItem onClick={() => onAction("snooze", item)}>
-              <Clock3 aria-hidden /> Snooze
-            </DropdownMenuItem>
-            <DropdownMenuItem onClick={() => onAction("archive", item)}>
-              <Archive aria-hidden /> Archive
-            </DropdownMenuItem>
+            {item.status === "completed" ? (
+              <DropdownMenuItem onClick={() => onAction("reopen", item)}>
+                <RotateCcw aria-hidden /> Not done yet
+              </DropdownMenuItem>
+            ) : (
+              <DropdownMenuItem onClick={() => onAction("complete", item)}>
+                <CheckCircle2 aria-hidden /> Mark as done
+              </DropdownMenuItem>
+            )}
+            {item.status === "archived" ? (
+              <DropdownMenuItem onClick={() => onAction("restore", item)}>
+                <ArchiveRestore aria-hidden /> Move to inbox
+              </DropdownMenuItem>
+            ) : (
+              <DropdownMenuItem onClick={() => onAction("archive", item)}>
+                <Archive aria-hidden /> Archive
+              </DropdownMenuItem>
+            )}
             <DropdownMenuSeparator />
             <DropdownMenuItem variant="destructive" onClick={() => onAction("delete", item)}>
               <Trash2 aria-hidden /> Delete

@@ -9,7 +9,7 @@ Update this file after each numbered implementation stage. Stage documents live 
 | 03 | `03_SYSTEM_ARCHITECTURE.md` | Done | `docs/ARCHITECTURE.md`; shared error format, request ids, JSON logs, size and rate limits, SSRF guards, readiness check, typed web API client |
 | 04 | `04_DATABASE_AND_DATA_MODELS.md` | Done | `docs/DATA_MODEL.md`; 6 tables, initial migration `08f4688f0da9` with 9 system categories; ownership, consent and deletion enforced by the database |
 | 05 | `05_AUTH_AND_USER_ACCOUNTS.md` | Done | `docs/AUTH.md`; Better Auth (web) + EdDSA JWT verified by FastAPI via JWKS; protected `/app`, settings, sign-out, account deletion; e2e passing at 1440 and 390 |
-| 06 | `06_CAPTURE_AND_INBOX_FEATURE.md` | Not started | |
+| 06 | `06_CAPTURE_AND_INBOX_FEATURE.md` | Done | `docs/CAPTURE.md`; capture with idempotent retries and duplicate links, inbox with filters and pagination, detail and edit, done, archive and delete; analysis as a separate step |
 | 07 | `07_AI_UNDERSTANDING_FEATURE.md` | Not started | |
 | 08 | `08_AI_AGENTS_AND_TOOLS.md` | Not started | |
 | 09 | `09_ORGANIZATION_AND_SEARCH.md` | Not started | |
@@ -163,3 +163,41 @@ Update this file after each numbered implementation stage. Stage documents live 
   3. The auth rate limits are strict (5 sign-ups per 10 minutes per IP), so repeated local end-to-end runs can hit them; clear `auth."rateLimit"` in development if needed.
   4. `backend/.env` still contains the old `AUTH_SECRET` line, which is now unused and can be removed.
 - **Next stage:** 06 — `06_CAPTURE_AND_INBOX_FEATURE.md` (not started).
+
+### 2026-11-21 — Stage 06
+- **Stage:** 06 — Capture and Inbox
+- **Summary:**
+  - `POST /api/v1/captures`, with one handler per input kind (text and URL now; image and voice plug in later). It runs safe URL validation and normalisation, stores the original first, and records a `captured` activity.
+  - `client_request_id` idempotency, so double-clicks and retries after a network failure return the same item.
+  - Duplicate links (ignoring tracking parameters) return the open item.
+  - Analysis runs after the response in its own session: `off` without a key, otherwise `pending`, then `ready` or `failed`. It is safe if the item was deleted meanwhile.
+  - Intentions list (newest first, keyset cursor, status filters), detail, edit (user edits marked in `field_states`; the original is immutable), status changes with timestamps, hard delete, and a categories list.
+  - Web: global capture from the shell, the empty state and the phone bar, with a toast after the server confirms; inbox with filters in the URL, load more, row actions with undo and delete confirmation; item detail with the original, "Open original" and editable title, reason, category and tags.
+- **Files changed:**
+  - Backend:
+    - `app/models/intention.py`
+    - migration `325c29f0dab2` (`normalized_url`, `client_request_id` and indexes)
+    - `app/core/url_safety.py` (`normalize_url`)
+    - `app/schemas/intentions.py`
+    - `app/services/{capture,intentions,analysis,activity}.py`
+    - `app/api/routes/intentions.py`, `app/api/router.py`
+    - `tests/{api_utils,test_capture}.py`
+  - Frontend:
+    - `src/features/intentions/{types,api,labels,intention-row}.ts(x)`
+    - `src/features/capture/capture-composer.tsx` and its test
+    - `src/components/app-shell/app-shell.tsx`
+    - `src/app/(app)/app/{session-shell,inbox-home}.tsx`
+    - `src/app/(app)/app/items/[id]/*`
+    - `vitest.setup.ts` (Testing Library cleanup)
+    - `e2e/capture.spec.ts`
+  - `docs/CAPTURE.md`
+- **Validation:**
+  - Backend `pytest`: 124 passed (33 new).
+  - Frontend: lint and typecheck pass; `vitest` 26 passed; `next build` passes.
+  - Playwright `capture.spec.ts` passed at 1440 and 390 against the real API and PostgreSQL.
+  - The migration is applied to the local dev database, and no e2e accounts are left behind.
+- **Known issues:**
+  1. Real AI analysis and suggestion display come in stage 07; until then items show "Suggestions are not switched on yet".
+  2. Search, tag and category filters on the list come in stage 09.
+  3. Snooze and resurfacing come in stage 10.
+- **Next stage:** 07 — `07_AI_UNDERSTANDING_FEATURE.md` (not started).

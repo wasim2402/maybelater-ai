@@ -71,3 +71,33 @@ async def resolve_public_url(url: str) -> str:
     if not addresses or not all(_is_public_ip(ipaddress.ip_address(a.split("%")[0])) for a in addresses):
         raise UnsafeUrlError()
     return url
+
+
+# Query parameters that only track where a click came from. Everything else in the query is kept,
+# because it often *is* the content (?v=video-id, ?id=product, ?q=search).
+_TRACKING_PARAMS = {
+    "fbclid", "gclid", "dclid", "gbraid", "wbraid", "msclkid", "yclid", "twclid", "ttclid", "igshid",
+    "mc_cid", "mc_eid", "_hsenc", "_hsmi", "mkt_tok", "ref_src", "si",
+}
+
+
+def normalize_url(url: str) -> str:
+    """A stable form of a link, used to spot duplicates. It never changes what the link points at:
+    lower-case scheme and host, no default port, no `utm_*` or click-tracking parameters; the path,
+    the remaining query (in order) and the fragment are kept as they were."""
+    from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
+
+    parts = urlsplit(url.strip())
+    scheme = parts.scheme.lower()
+    host = (parts.hostname or "").rstrip(".").lower()
+    if ":" in host:  # IPv6 literal: hostname drops the brackets
+        host = f"[{host}]"
+    if parts.port and not ((scheme == "http" and parts.port == 80) or (scheme == "https" and parts.port == 443)):
+        host = f"{host}:{parts.port}"
+    query = [
+        (k, v)
+        for k, v in parse_qsl(parts.query, keep_blank_values=True)
+        if not k.lower().startswith("utm_") and k.lower() not in _TRACKING_PARAMS
+    ]
+    path = parts.path or "/"
+    return urlunsplit((scheme, host, path, urlencode(query, doseq=True), parts.fragment))

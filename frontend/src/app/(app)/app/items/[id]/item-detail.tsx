@@ -1,0 +1,266 @@
+"use client";
+
+import { format } from "date-fns";
+import { AlertCircle, Archive, ArchiveRestore, ArrowLeft, CheckCircle2, ExternalLink, RotateCcw, Sparkles, Trash2 } from "lucide-react";
+import Link from "next/link";
+import { useParams, useRouter } from "next/navigation";
+import { useId, useState } from "react";
+import { toast } from "sonner";
+
+import { ConfirmDialog } from "@/components/feedback/confirm-dialog";
+import { ErrorState, ListSkeleton, SuccessNote } from "@/components/feedback/state-views";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { useCategories, useDeleteIntention, useIntention, useUpdateIntention } from "@/features/intentions/api";
+import { displayTitle } from "@/features/intentions/intention-row";
+import { CategoryLabel, StatusLabel } from "@/features/intentions/labels";
+import type { Intention, IntentionUpdate } from "@/features/intentions/types";
+import { ApiError } from "@/lib/api/errors";
+
+export function ItemDetail() {
+  const { id } = useParams<{ id: string }>();
+  const item = useIntention(id);
+
+  return (
+    <div className="mx-auto max-w-3xl">
+      <Link href="/app" className="inline-flex h-11 items-center gap-2 text-[15px] font-medium text-ink/80 hover:text-ink">
+        <ArrowLeft aria-hidden className="size-4" /> Inbox
+      </Link>
+      {item.isPending ? (
+        <div className="mt-4">
+          <ListSkeleton rows={2} label="Loading this item" />
+        </div>
+      ) : item.isError ? (
+        <ErrorState
+          className="mt-4"
+          title={item.error instanceof ApiError && item.error.code === "not_found" ? "This item no longer exists" : "This item did not load"}
+          action={
+            item.error instanceof ApiError && item.error.code === "not_found" ? (
+              <Button variant="outline" render={<Link href="/app" />}>
+                Back to your inbox
+              </Button>
+            ) : (
+              <Button variant="outline" onClick={() => item.refetch()}>
+                Try again
+              </Button>
+            )
+          }
+        >
+          {item.error instanceof ApiError && item.error.code === "not_found" ? "It may have been deleted." : item.error.message}
+        </ErrorState>
+      ) : (
+        <Loaded key={item.data.id} item={item.data} />
+      )}
+    </div>
+  );
+}
+
+function Loaded({ item }: { item: Intention }) {
+  const router = useRouter();
+  const update = useUpdateIntention();
+  const remove = useDeleteIntention();
+  const [confirmDelete, setConfirmDelete] = useState(false);
+
+  function setStatus(status: Intention["status"], message: string) {
+    const previous = item.status;
+    update.mutate(
+      { id: item.id, update: { status } },
+      {
+        onSuccess: () =>
+          toast(message, { action: { label: "Undo", onClick: () => update.mutate({ id: item.id, update: { status: previous } }) } }),
+        onError: (e) => toast.error(e.message),
+      },
+    );
+  }
+
+  return (
+    <article className="mt-2 space-y-8">
+      <header className="space-y-3">
+        <div className="flex flex-wrap gap-2">
+          <StatusLabel status={item.status} />
+          {item.category ? <CategoryLabel>{item.category.name}</CategoryLabel> : null}
+        </div>
+        <h1 className="text-3xl leading-tight break-words sm:text-4xl">{displayTitle(item)}</h1>
+        <p className="text-[13px] text-muted-foreground">Saved {format(new Date(item.created_at), "EEEE d MMMM yyyy, HH:mm")}</p>
+        <div className="flex flex-wrap gap-2 pt-1">
+          {item.status === "completed" ? (
+            <Button variant="outline" onClick={() => setStatus("inbox", "Back in your inbox.")}>
+              <RotateCcw aria-hidden /> Not done yet
+            </Button>
+          ) : (
+            <Button onClick={() => setStatus("completed", "Marked as done.")}>
+              <CheckCircle2 aria-hidden /> Mark as done
+            </Button>
+          )}
+          {item.status === "archived" ? (
+            <Button variant="outline" onClick={() => setStatus("inbox", "Back in your inbox.")}>
+              <ArchiveRestore aria-hidden /> Move to inbox
+            </Button>
+          ) : (
+            <Button variant="outline" onClick={() => setStatus("archived", "Archived.")}>
+              <Archive aria-hidden /> Archive
+            </Button>
+          )}
+          <Button variant="ghost" className="text-destructive hover:bg-destructive/10 hover:text-destructive" onClick={() => setConfirmDelete(true)}>
+            <Trash2 aria-hidden /> Delete
+          </Button>
+        </div>
+      </header>
+
+      <section aria-labelledby="original-h" className="space-y-2">
+        <h2 id="original-h" className="text-[13px] font-medium tracking-normal text-muted-foreground">
+          What you saved
+        </h2>
+        {item.original_url ? (
+          <div className="space-y-2 rounded-lg border border-line bg-card p-4">
+            <p className="font-mono text-sm break-all">{item.original_url}</p>
+            <Button variant="outline" size="sm" render={<a href={item.original_url} target="_blank" rel="noopener noreferrer nofollow" />}>
+              <ExternalLink aria-hidden /> Open original
+            </Button>
+          </div>
+        ) : (
+          <p className="rounded-lg border border-line bg-card p-4 text-[15px] whitespace-pre-wrap break-words">{item.original_content}</p>
+        )}
+      </section>
+
+      <AnalysisNote state={item.analysis_status} />
+
+      <EditForm item={item} />
+
+      <ConfirmDialog
+        open={confirmDelete}
+        onOpenChange={setConfirmDelete}
+        title="Delete this item?"
+        description={
+          <>
+            <strong className="font-medium">{displayTitle(item)}</strong> and anything attached to it will be removed for good.
+          </>
+        }
+        confirmLabel="Delete item"
+        destructive
+        onConfirm={async () => {
+          await remove.mutateAsync(item.id);
+          toast("Item deleted.");
+          router.replace("/app");
+        }}
+      />
+    </article>
+  );
+}
+
+function AnalysisNote({ state }: { state: Intention["analysis_status"] }) {
+  if (state === "ready") return null;
+  const content = {
+    pending: { icon: Sparkles, text: "Reading what you saved to suggest a title and why it matters. Your item is already safe." },
+    failed: { icon: AlertCircle, text: "Suggestions could not be made this time. Your item is saved exactly as you wrote it." },
+    off: { icon: Sparkles, text: "Suggestions are not switched on yet. Add your own title and reason below." },
+  }[state];
+  const Icon = content.icon;
+  return (
+    <p role="status" className="flex items-start gap-2.5 rounded-lg bg-sage-soft/50 px-4 py-3 text-[15px]">
+      <Icon aria-hidden className={state === "pending" ? "mt-0.5 size-4 shrink-0 animate-pulse text-sage-deep" : "mt-0.5 size-4 shrink-0 text-sage-deep"} />
+      {content.text}
+    </p>
+  );
+}
+
+function EditForm({ item }: { item: Intention }) {
+  const id = useId();
+  const update = useUpdateIntention();
+  const categories = useCategories();
+  const [title, setTitle] = useState(item.title ?? "");
+  const [note, setNote] = useState(item.user_note ?? "");
+  const [categoryId, setCategoryId] = useState(item.category?.id ?? "");
+  const [tags, setTags] = useState(item.tags.join(", "));
+  const [saved, setSaved] = useState(false);
+
+  const changes: IntentionUpdate = {};
+  if (title.trim() !== (item.title ?? "")) changes.title = title.trim();
+  if (note.trim() !== (item.user_note ?? "")) changes.user_note = note.trim();
+  if (categoryId !== (item.category?.id ?? "")) changes.category_id = categoryId || null;
+  const tagList = tags.split(",").map((t) => t.trim()).filter(Boolean);
+  if (tagList.join(",").toLowerCase() !== item.tags.join(",")) changes.tags = tagList;
+  const dirty = Object.keys(changes).length > 0;
+
+  const touch = <T,>(setter: (v: T) => void) => (value: T) => {
+    setter(value);
+    setSaved(false);
+  };
+
+  return (
+    <section aria-labelledby={`${id}-h`} className="space-y-4">
+      <h2 id={`${id}-h`} className="text-xl">
+        Details
+      </h2>
+      <form
+        className="space-y-4"
+        onSubmit={(e) => {
+          e.preventDefault();
+          if (!dirty) return;
+          update.mutate({ id: item.id, update: changes }, { onSuccess: () => setSaved(true) });
+        }}
+      >
+        <div className="space-y-1.5">
+          <label htmlFor={`${id}-title`} className="text-sm font-medium">
+            Title
+          </label>
+          <Input id={`${id}-title`} value={title} maxLength={300} onChange={(e) => touch(setTitle)(e.target.value)} />
+        </div>
+        <div className="space-y-1.5">
+          <label htmlFor={`${id}-note`} className="text-sm font-medium">
+            Why you saved it
+          </label>
+          <Textarea id={`${id}-note`} value={note} maxLength={1000} rows={3} onChange={(e) => touch(setNote)(e.target.value)} />
+        </div>
+        <div className="grid gap-4 sm:grid-cols-2">
+          <div className="space-y-1.5">
+            <label htmlFor={`${id}-category`} className="text-sm font-medium">
+              Category
+            </label>
+            <select
+              id={`${id}-category`}
+              value={categoryId}
+              onChange={(e) => touch(setCategoryId)(e.target.value)}
+              className="h-12 w-full rounded-md border border-input bg-card px-3 text-base focus-visible:outline-2 focus-visible:outline-ring"
+            >
+              <option value="">No category</option>
+              {(categories.data ?? []).map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.name}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div className="space-y-1.5">
+            <label htmlFor={`${id}-tags`} className="text-sm font-medium">
+              Tags
+            </label>
+            <Input
+              id={`${id}-tags`}
+              value={tags}
+              onChange={(e) => touch(setTags)(e.target.value)}
+              aria-describedby={`${id}-tags-hint`}
+            />
+            <p id={`${id}-tags-hint`} className="text-[13px] text-muted-foreground">
+              Separate tags with commas.
+            </p>
+          </div>
+        </div>
+        <div className="flex flex-wrap items-center gap-3">
+          <Button type="submit" disabled={!dirty || update.isPending}>
+            {update.isPending ? "Saving…" : "Save changes"}
+          </Button>
+          <div aria-live="polite">
+            {saved && !dirty ? <SuccessNote>Saved.</SuccessNote> : null}
+            {update.isError ? (
+              <p role="alert" className="text-sm text-destructive">
+                {update.error.message}
+              </p>
+            ) : null}
+          </div>
+        </div>
+      </form>
+    </section>
+  );
+}

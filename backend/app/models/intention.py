@@ -53,6 +53,8 @@ class Intention(UUIDPrimaryKey, Timestamps, Base):
         Index("ix_intentions_user_resurface_at", "user_id", "resurface_at", postgresql_where=text(OPEN_STATUSES + " AND resurface_at IS NOT NULL")),
         Index("ix_intentions_user_snoozed_until", "user_id", "snoozed_until", postgresql_where=text("snoozed_until IS NOT NULL")),
         Index("ix_intentions_category_id", "category_id"),
+        Index("ix_intentions_user_normalized_url", "user_id", "normalized_url", postgresql_where=text("normalized_url IS NOT NULL")),
+        Index("uq_intentions_user_client_request", "user_id", "client_request_id", unique=True, postgresql_where=text("client_request_id IS NOT NULL")),
         Index("ix_intentions_tags", "tags", postgresql_using="gin"),
     )
 
@@ -63,6 +65,10 @@ class Intention(UUIDPrimaryKey, Timestamps, Base):
     original_content: Mapped[str] = mapped_column(Text, nullable=False)
     original_url: Mapped[str | None] = mapped_column(String(2048))
     user_note: Mapped[str | None] = mapped_column(String(1000))  # "why I saved it", in the user's words
+    # Normalised form of original_url (tracking parameters removed): finds duplicates of the same link.
+    normalized_url: Mapped[str | None] = mapped_column(String(2048))
+    # Idempotency key sent by the client per capture attempt: a retry returns the same item.
+    client_request_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True))
 
     # --- interpretation (AI-suggested or user-edited; see field_states) ---
     title: Mapped[str | None] = mapped_column(String(300))
