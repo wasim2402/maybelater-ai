@@ -1,21 +1,37 @@
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.router import api_router
 from app.core.config import Settings, get_settings
 from app.core.errors import register_error_handlers
-from app.core.logging import configure_logging
+from app.core.logging import configure_logging, resolve_format
 from app.core.middleware import BodySizeLimitMiddleware, RequestContextMiddleware
+from app.core.startup import report_startup
+from app.db.session import engine
 from app.schemas.common import ERROR_RESPONSES
+
+VERSION = "0.1.0"
 
 
 def create_app(settings: Settings | None = None) -> FastAPI:
     settings = settings or get_settings()
-    configure_logging(settings.log_level)
+    log_format = resolve_format(settings.log_format, settings.is_development)
+    configure_logging(settings.log_level, log_format)
+
+    @asynccontextmanager
+    async def lifespan(_: FastAPI) -> AsyncIterator[None]:
+        # The status panel (database, sign-in keys, AI, URLs). Skipped in tests, which build many apps.
+        if settings.app_env != "test":
+            await report_startup(settings, engine, VERSION, log_format)
+        yield
 
     app = FastAPI(
         title="MaybeLater API",
-        version="0.1.0",
+        version=VERSION,
+        lifespan=lifespan,
         responses=ERROR_RESPONSES,
         # Interactive docs in development only.
         docs_url="/docs" if settings.is_development else None,

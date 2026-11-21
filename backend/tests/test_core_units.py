@@ -100,11 +100,11 @@ def test_cors_origins_parsing_and_wildcard_rejected() -> None:
         Settings(cors_origins="*", _env_file=None)  # type: ignore[call-arg]
 
 
-def test_production_requires_auth_secret() -> None:
+def test_production_requires_https_auth() -> None:
     with pytest.raises(ValueError):
-        Settings(app_env="production", auth_secret="", cors_origins="https://app.example", _env_file=None)  # type: ignore[call-arg]
-    ok = Settings(app_env="production", auth_secret="s" * 40, cors_origins="https://app.example", _env_file=None)  # type: ignore[call-arg]
-    assert ok.app_env == "production"
+        Settings(app_env="production", auth_base_url="http://app.example", cors_origins="https://app.example", _env_file=None)  # type: ignore[call-arg]
+    ok = Settings(app_env="production", auth_base_url="https://app.example", cors_origins="https://app.example", _env_file=None)  # type: ignore[call-arg]
+    assert ok.auth_jwks_url == "https://app.example/api/auth/jwks"
 
 
 def test_unconfigured_ai_provider_raises_clear_error() -> None:

@@ -25,6 +25,7 @@ __pycache__/
 Thumbs.db
 .vscode/*
 !.vscode/extensions.json
+!.vscode/launch.json
 .idea/
 
 # Taste Skill working files (gate state, screenshots, Chrome profiles)

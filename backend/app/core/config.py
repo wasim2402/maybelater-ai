@@ -17,6 +17,8 @@ class Settings(BaseSettings):
     api_host: str = "0.0.0.0"
     api_port: int = 8000
     log_level: str = "INFO"
+    # auto: readable coloured lines in development, JSON lines everywhere else.
+    log_format: Literal["auto", "pretty", "json"] = "auto"
 
     database_url: str = "postgresql+asyncpg://maybelater@localhost:5432/maybelater"
     test_database_url: str = ""
@@ -25,8 +27,11 @@ class Settings(BaseSettings):
     openai_model: str = ""
     ai_timeout_seconds: float = 30.0
 
-    auth_secret: str = ""
-    auth_base_url: str = "http://localhost:3000"
+    # Sessions are issued by Better Auth in the web app. The API verifies its short-lived JWTs with the
+    # public keys at AUTH_JWKS_URL (EdDSA). No secret is shared between the apps.
+    auth_base_url: str = "http://localhost:3000"  # Better Auth base URL = the token issuer
+    auth_jwks_url: str = ""  # default: {auth_base_url}/api/auth/jwks
+    auth_audience: str = "maybelater-api"
 
     # Known web origins only. Accepts a JSON list or a comma-separated string.
     cors_origins: Annotated[list[str], NoDecode] = ["http://localhost:3000"]
@@ -57,9 +62,11 @@ class Settings(BaseSettings):
 
     @model_validator(mode="after")
     def _production_requirements(self) -> "Settings":
+        if not self.auth_jwks_url:
+            self.auth_jwks_url = f"{self.auth_base_url.rstrip('/')}/api/auth/jwks"
         if self.app_env in ("staging", "production"):
-            if len(self.auth_secret) < 32:
-                raise ValueError("AUTH_SECRET must be set (32+ characters) outside development")
+            if not (self.auth_base_url.startswith("https://") and self.auth_jwks_url.startswith("https://")):
+                raise ValueError("AUTH_BASE_URL and AUTH_JWKS_URL must use https outside development")
             if any(o.startswith("http://") and "localhost" not in o for o in self.cors_origins):
                 raise ValueError("CORS_ORIGINS must use https outside development")
         return self

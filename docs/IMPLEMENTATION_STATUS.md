@@ -8,7 +8,7 @@ Update this file after each numbered implementation stage. Stage documents live 
 | 02 | `02_DESIGN_SYSTEM_AND_UX.md` | Done | `docs/DESIGN_SYSTEM.md`; theme in `src/theme/`; landing `/`, `/login`, `/signup`; Taste Skill gate PASS. Auth not wired (stage 05). |
 | 03 | `03_SYSTEM_ARCHITECTURE.md` | Done | `docs/ARCHITECTURE.md`; shared error format, request ids, JSON logs, size and rate limits, SSRF guards, readiness check, typed web API client |
 | 04 | `04_DATABASE_AND_DATA_MODELS.md` | Done | `docs/DATA_MODEL.md`; 6 tables, initial migration `08f4688f0da9` with 9 system categories; ownership, consent and deletion enforced by the database |
-| 05 | `05_AUTH_AND_USER_ACCOUNTS.md` | Not started | |
+| 05 | `05_AUTH_AND_USER_ACCOUNTS.md` | Done | `docs/AUTH.md`; Better Auth (web) + EdDSA JWT verified by FastAPI via JWKS; protected `/app`, settings, sign-out, account deletion; e2e passing at 1440 and 390 |
 | 06 | `06_CAPTURE_AND_INBOX_FEATURE.md` | Not started | |
 | 07 | `07_AI_UNDERSTANDING_FEATURE.md` | Not started | |
 | 08 | `08_AI_AGENTS_AND_TOOLS.md` | Not started | |
@@ -122,3 +122,44 @@ Update this file after each numbered implementation stage. Stage documents live 
   1. Better Auth's own tables arrive in stage 05; account deletion must remove those rows too.
   2. The rule that AI writes only `suggested` fields is documented in the schema and enforced in the service in stage 07.
 - **Next stage:** 05 — `05_AUTH_AND_USER_ACCOUNTS.md` (not started).
+
+### 2026-11-21 — Stage 05
+- **Stage:** 05 — Authentication and User Accounts
+- **Summary:** Better Auth 1.7.24 in Next.js: email and password, HTTP-only session cookies, database-backed rate limits, and its tables in a separate `auth` schema (`npm run auth:migrate`). The JWT plugin issues 15-minute EdDSA tokens. FastAPI verifies them on its own:
+  - public keys come from JWKS; EdDSA only; `exp`, `iat`, `sub`, `iss` and `aud` are all checked;
+  - the identity comes only from `sub`, and the app user is created on first contact;
+  - `current_user` protects routes, and rate limits key on the user.
+
+  Added `GET`, `PATCH` and `DELETE /api/v1/me`. The web side has a bearer-token client (memory cache, refresh, retry once on 401, session-expired redirect, no cookies sent to the API), `src/proxy.ts` for early redirects, and a server-validated protected layout under `<Suspense>`. Built the working login and signup with vague errors and safe `next` redirects; `/app` reads the account from the API; and `/app/settings` covers display name, time zone, sign-out and account deletion. Deletion checks the password, then a `beforeDelete` hook deletes the API data before removing the auth account.
+- **Files changed:**
+  - Backend:
+    - `app/core/{auth,deps,config}.py`
+    - `app/services/users.py`
+    - `app/api/routes/me.py`, `app/api/router.py`
+    - `tests/test_auth.py`, `tests/test_core_units.py`
+  - Frontend:
+    - `src/lib/auth/{options,server,client}.ts`
+    - `src/app/api/auth/[...all]/route.ts`
+    - `src/proxy.ts`
+    - `src/lib/api/{client,token}.ts` and their tests
+    - `src/features/account/api.ts`
+    - `src/features/auth/{auth-form,auth-form.test}.ts(x)`
+    - `src/app/(app)/app/{layout,session-shell,page,inbox-home}.tsx`
+    - `src/app/(app)/app/settings/*`
+    - `src/app/(app)/{login,signup}/page.tsx`
+    - `src/components/app-shell/app-shell.tsx`
+    - `scripts/migrate-auth.mts`, `e2e/auth.spec.ts`, `playwright.config.ts`
+    - `package.json`: `better-auth@1.7.24`, `pg@8.23.1`, `server-only`, `@types/pg`, `auth:migrate`
+    - `tsconfig.json`
+  - Shared: `.env.example`, `docs/AUTH.md`, `docs/ARCHITECTURE.md`, `docs/DATA_MODEL.md`
+- **Validation:**
+  - Backend `pytest`: 84 passed (24 new auth and account tests).
+  - Frontend: lint and typecheck pass; `vitest` 22 passed; `next build` passes (`/app` partially prerendered, proxy active).
+  - Playwright end to end against the real web app, API and PostgreSQL: 2 tests passed at desktop (1440) and at phone width (390).
+  - After the runs, the database holds no test accounts.
+- **Known issues:**
+  1. There is no email sender yet, so email verification and password reset are not offered. Sign-up therefore cannot fully hide whether an email exists, though its message never confirms it.
+  2. Playwright's own browser download is out of date on this machine; use `PLAYWRIGHT_CHANNEL=chrome` or run `npx playwright install`.
+  3. The auth rate limits are strict (5 sign-ups per 10 minutes per IP), so repeated local end-to-end runs can hit them; clear `auth."rateLimit"` in development if needed.
+  4. `backend/.env` still contains the old `AUTH_SECRET` line, which is now unused and can be removed.
+- **Next stage:** 06 — `06_CAPTURE_AND_INBOX_FEATURE.md` (not started).

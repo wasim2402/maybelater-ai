@@ -137,7 +137,7 @@ Further privacy rules:
 
 ## Auth tables
 
-Better Auth (stage 05) manages its own tables (`user`, `session`, `account`, `verification`) in the same database. These are separate from the app's `users` table, and the verified token's subject links the two through `users.auth_subject`. Account deletion in stage 05 or 12 must delete both.
+Better Auth manages its own tables (`user`, `session`, `account`, `verification`, `jwks`, `rateLimit`) in the separate **`auth` schema** of the same database, created by `npm run auth:migrate` in `frontend/`. Alembic only manages `public`. The verified token's subject links the two through `users.auth_subject`. Account deletion removes both: the app data first (through the API), then the auth account (`docs/AUTH.md`).
 
 ## Working with migrations
 
