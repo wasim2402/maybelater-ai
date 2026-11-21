@@ -6,10 +6,12 @@ import { toast } from "sonner";
 
 import { APP_NAV, AppShell } from "@/components/app-shell/app-shell";
 import type { CaptureInput } from "@/features/capture/capture-schema";
+import { useMe } from "@/features/account/api";
 import { useCapture } from "@/features/intentions/api";
 import { useReminderAlerts } from "@/features/reminders/use-reminder-alerts";
 import { useRecommendations } from "@/features/resurfacing/api";
 import { setUnauthenticatedHandler } from "@/lib/api/client";
+import { applyMotionPreference } from "@/lib/motion";
 import type { SessionUser } from "@/lib/auth/server";
 
 const CaptureContext = createContext<{ openCapture: () => void }>({ openCapture: () => {} });
@@ -38,6 +40,13 @@ export function SessionShell({ user, children }: { user: SessionUser; children: 
       ),
     [resurfacedCount, dueCount],
   );
+
+  // "Reduce motion" from Settings applies across the app (on top of the system setting).
+  const reduceMotion = useMe().data?.preferences.reduce_motion ?? false;
+  useEffect(() => {
+    applyMotionPreference(reduceMotion);
+    return () => applyMotionPreference(false);
+  }, [reduceMotion]);
 
   useEffect(() => {
     setUnauthenticatedHandler(() => {

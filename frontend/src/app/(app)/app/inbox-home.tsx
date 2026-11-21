@@ -10,6 +10,8 @@ import { ConfirmDialog } from "@/components/feedback/confirm-dialog";
 import { EmptyState, ErrorState, ListSkeleton } from "@/components/feedback/state-views";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { useMe } from "@/features/account/api";
+import { ForYouNow, QuickCapture } from "@/features/dashboard/for-you-now";
 import { useCategories, useDeleteIntention, useIntentions, useTags, useUpdateIntention } from "@/features/intentions/api";
 import { hasRefinements, readFilters, rememberInboxUrl, writeFilters } from "@/features/intentions/inbox-url";
 import { displayTitle, IntentionRow, type IntentionAction } from "@/features/intentions/intention-row";
@@ -56,6 +58,7 @@ export function InboxHome() {
   const params = useSearchParams();
   const filters = readFilters(new URLSearchParams(params.toString()));
   const openCapture = useOpenCapture();
+  const me = useMe();
 
   const list = useIntentions(filters);
   const categories = useCategories();
@@ -122,12 +125,17 @@ export function InboxHome() {
 
   return (
     <div className="mx-auto max-w-3xl">
-      <div className="flex flex-wrap items-end justify-between gap-4">
-        <h1 className="text-3xl sm:text-4xl">Inbox</h1>
-        <Button onClick={openCapture} className="hidden sm:inline-flex md:hidden">
-          <Plus aria-hidden /> Save something
-        </Button>
+      <h1 className="text-3xl sm:text-4xl">Inbox</h1>
+
+      <div className="mt-5">
+        <QuickCapture onOpen={openCapture} />
       </div>
+
+      {filters.status === "open" && !refined ? (
+        <div className="mt-5">
+          <ForYouNow userZone={me.data?.timezone} />
+        </div>
+      ) : null}
 
       <div role="search" className="mt-5 space-y-3" aria-label="Search and filter saved items">
         <div className="relative">
@@ -260,6 +268,11 @@ export function InboxHome() {
           )
         ) : (
           <>
+            {filters.status === "open" && !refined ? (
+              <h2 className="mb-1 px-1 text-xl" id={`${id}-recent`}>
+                Recently saved
+              </h2>
+            ) : null}
             <ul className={cn("space-y-1 transition-opacity", searching && "opacity-60")} aria-label="Saved items">
               {items.map((item) => (
                 <IntentionRow key={item.id} item={item} href={`/app/items/${item.id}`} onAction={act} />

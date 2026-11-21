@@ -14,8 +14,8 @@ Update this file after each numbered implementation stage. Stage documents live 
 | 08 | `08_AI_AGENTS_AND_TOOLS.md` | Done | `docs/AGENTS.md`; Capture Understanding Agent with 3 narrow, audited tools; later agents documented only; evaluation set and live run (12/12 passed) |
 | 09 | `09_ORGANIZATION_AND_SEARCH.md` | Done | `docs/SEARCH.md`; PostgreSQL full-text search, combinable filters in the URL, own categories, tag counts; e2e at 1440 and 390 |
 | 10 | `10_SMART_RESURFACING_ENGINE.md` | Done | `docs/RESURFACING.md`; pure, deterministic rules engine (date, snooze, confirmed condition, opt-in stale) in the user's time zone; Resurfaced page, bring-it-back, snooze and not-now actions, settings. |
-| 11 | `11_REMINDERS_AND_NOTIFICATIONS.md` | Done | `docs/REMINDERS.md`; reminders confirmed by the user, stored with their zone; delivered once per version by a PostgreSQL-backed worker on the server (SKIP LOCKED, idempotent delivery records, retries with backoff); quiet hours and pause; Reminders page, item panel, settings. Reminders e2e written, not yet run (see below). |
-| 12 | `12_USER_DASHBOARD_AND_SETTINGS.md` | Not started | |
+| 11 | `11_REMINDERS_AND_NOTIFICATIONS.md` | Done | `docs/REMINDERS.md`; reminders confirmed by the user, stored with their zone; delivered once per version by a PostgreSQL-backed worker on the server (SKIP LOCKED, idempotent delivery records, retries with backoff); quiet hours and pause; Reminders page, item panel, settings. |
+| 12 | `12_USER_DASHBOARD_AND_SETTINGS.md` | Done | `docs/APP_SHELL.md`; dashboard with quick capture, "Back for you" (real due reminders and resurfaced items only), recently saved, search and filters; reduce-motion setting applied app-wide; responsive shell tested end to end at 390, 768 and 1440 px. |
 | 13 | `13_TESTING_AND_QUALITY.md` | Not started | |
 | 14 | `14_DEPLOYMENT_AND_OPERATIONS.md` | Not started | |
 | 15 | `15_MVP_ACCEPTANCE_CHECKLIST.md` | Not started | |
@@ -388,7 +388,41 @@ Update this file after each numbered implementation stage. Stage documents live 
   - Migration applied to the dev database; `alembic check` reports no drift.
   - Frontend: lint and typecheck pass; `vitest` 45 passed (5 new); `next build` passes (`/app/reminders` is a partial prerender).
 - **Known issues:**
-  1. `e2e/reminders.spec.ts` has not been run yet. The backend on port 8000 was started before this stage (`/api/v1/reminders` returned 404). After restarting it, run `PLAYWRIGHT_CHANNEL=chrome npx playwright test e2e/reminders.spec.ts --project=desktop`. It takes about 3 minutes because it waits for the server to deliver in real time.
+  1. `e2e/reminders.spec.ts` (desktop, Chrome) passed on 2026-11-21 at the start of stage 12, in 3.9 minutes: the server delivered the reminder with no page open, and done, cancel and quiet hours all worked.
   2. With several reminders due during quiet hours, each pass re-reads them (batch of 100) until the hours end. This is fine at MVP scale; a `deliver_after` column would remove the re-reads.
   3. The scheduler is PostgreSQL, not Redis with ARQ, which the stage allows as long as it is documented. Revisit when email or push arrive (stage 14).
 - **Next stage:** 12 — `12_USER_DASHBOARD_AND_SETTINGS.md` (not started).
+
+### 2026-11-21 — Stage 12
+- **Stage:** 12 — Dashboard and Settings
+- **Summary:**
+  - **Dashboard (`/app`):**
+    - An always-visible quick-capture bar.
+    - "Back for you": up to 3 due reminders and 3 resurfaced items. It shows only in the default view and only when something is really due; otherwise it renders nothing. API failures are handled with a retry.
+    - A "Recently saved" heading over the URL-backed search and filters. The existing empty, error and loading states are kept.
+  - **Settings:** a new Accessibility section with **Reduce motion**, which updates immediately and reverts on failure. It is applied app-wide through `data-reduce-motion` on `<html>`, honoured by `globals.css` and `lib/motion.ts` (the capture pulse respects it). The remaining MVP settings (account, time zone, reminders, resurfacing, sign out, delete) were already in place.
+  - **Navigation:**
+    - Inbox, Resurfaced, Reminders and Settings, with counts.
+    - Completed stays as the Inbox's Done filter, following the design-stage information architecture (documented).
+    - The dev-only Next.js badge was turned off because it covered the phone tab bar.
+- **Bugs fixed during the stage:**
+  - The reduce-motion checkbox didn't change until the server replied (it now updates immediately).
+  - The dev badge intercepted taps on the phone Inbox tab.
+- **Files changed:**
+  - Frontend:
+    - `src/features/dashboard/{for-you-now.tsx,for-you-now.test.tsx}`, `src/lib/motion.ts`
+    - `src/app/(app)/app/{inbox-home.tsx,session-shell.tsx,settings/account-settings.tsx}`
+    - `src/features/capture/capture-composer.tsx`, `src/app/globals.css`, `next.config.ts`
+    - `e2e/dashboard.spec.ts`
+  - Docs: `docs/APP_SHELL.md`
+  - No backend changes (`preferences.reduce_motion` already existed).
+- **Validation:**
+  - Frontend: lint and typecheck pass; `vitest` 52 passed (7 new); `next build` passes.
+  - Playwright (Chrome):
+    - `dashboard.spec.ts` passed at mobile, tablet and desktop widths.
+    - Regression: `auth`, `capture` and `search` passed on desktop, and `search` on tablet.
+    - The stage 11 `reminders.spec.ts` passed.
+  - Backend unchanged (311 tests passing at the end of stage 11).
+- **Known issues:**
+  1. Running many e2e specs back to back reaches the sign-up limit (5 per 10 minutes, Better Auth) and the API's `DELETE /me` limit. Run specs in small groups with `--workers=1`, or clear the dev `auth."rateLimit"` rows and restart the API between runs. The limits themselves are intended.
+- **Next stage:** 13 — `13_TESTING_AND_QUALITY.md` (not started).

@@ -11,6 +11,7 @@ import { cn } from "cn";
 import { SuccessNote } from "@/components/feedback/state-views";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
+import { prefersReducedMotion } from "@/lib/motion";
 
 import { captureSchema, detectSourceType, toCaptureInput, type CaptureInput, type CaptureValues } from "./capture-schema";
 
@@ -53,7 +54,7 @@ export function CaptureComposer({ onCapture, autoFocus, className }: CaptureComp
 
   const { contextSafe } = useGSAP({ scope: rootRef });
   const confirmSaved = contextSafe(() => {
-    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+    if (prefersReducedMotion()) return;
     gsap.fromTo(
       "[data-capture-field]",
       { boxShadow: "0 0 0 0px rgb(139 154 110 / 0.55)" },

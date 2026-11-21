@@ -48,6 +48,7 @@ export function AccountSettings() {
           <ProfileForm me={me.data} />
           <RemindersForm me={me.data} />
           <ResurfacingForm me={me.data} />
+          <AccessibilityForm me={me.data} />
           <SessionSection />
           <DeleteAccountSection />
         </div>
@@ -499,6 +500,51 @@ function RemindersForm({ me }: { me: Me }) {
           </div>
         </div>
       </form>
+    </section>
+  );
+}
+
+/** Accessibility: reduce motion across the app, on top of the device's own setting. Saves on change. */
+function AccessibilityForm({ me }: { me: Me }) {
+  const id = useId();
+  const update = useUpdateMe();
+  // Shown at once; reverted if saving fails.
+  const [value, setValue] = useState(me.preferences.reduce_motion);
+
+  return (
+    <section aria-labelledby={`${id}-h`} className="space-y-4 border-t border-line pt-8">
+      <div>
+        <h2 id={`${id}-h`} className="text-xl">
+          Accessibility
+        </h2>
+        <p className="mt-1 text-[15px] text-ink/85">
+          If your device is set to reduce motion, MaybeLater already follows it. You can also turn motion down here.
+        </p>
+      </div>
+      <label className="flex items-start gap-3">
+        <input
+          type="checkbox"
+          checked={value}
+          onChange={(e) => {
+            const next = e.target.checked;
+            setValue(next);
+            update.mutate(
+              { preferences: { ...me.preferences, reduce_motion: next } },
+              { onSuccess: () => toast(next ? "Motion reduced." : "Motion back on."), onError: () => setValue(!next) },
+            );
+          }}
+          className="mt-1 size-4 accent-[var(--brand-sage-deep)]"
+        />
+        <span>
+          <span className="block text-[15px] font-medium">Reduce motion</span>
+          <span className="block text-[13px] text-muted-foreground">Turns off animations and smooth transitions in the app.</span>
+        </span>
+      </label>
+      {update.isError ? (
+        <p role="alert" className="text-sm text-destructive">
+          {update.error.message}
+        </p>
+      ) : null}
     </section>
   );
 }
